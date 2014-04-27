@@ -7,36 +7,32 @@
 
 #define Infinity (std::numeric_limits<float>::infinity())
 
-float minf(const float a, const float b) {
+inline float minf(const float a, const float b) {
 	return a < b ? a : b;
 }
 
-float maxf(const float a, const float b) {
+inline float maxf(const float a, const float b) {
 	return a > b ? a : b;
 }
 
-inline Point min(Point const& p0, Point const& p1) {
-	return Point(minf(p0.x, p1.x), minf(p0.y, p1.y), minf(p0.z, p1.z), minf(p0.w, p1.w));
+inline P3 min(P3 const& p0, P3 const& p1) {
+	return P3(minf(p0.x, p1.x), minf(p0.y, p1.y), minf(p0.z, p1.z));
 }
-inline Point max(Point const& p0, Point const& p1) {
-	return Point(maxf(p0.x, p1.x), maxf(p0.y, p1.y), maxf(p0.z, p1.z), maxf(p0.w, p1.w));
+
+inline P3 max(P3 const& p0, P3 const& p1) {
+	return P3(maxf(p0.x, p1.x), maxf(p0.y, p1.y), maxf(p0.z, p1.z));
 }
 
 struct Box {
 
-	Point m,n;
+	P3 m,n;
 
-	Box() {
-		m = Point(Infinity, Infinity, Infinity, Infinity);
-		n = Point(-Infinity, -Infinity, -Infinity, -Infinity);
-	}
+	Box()
+        : m( Infinity,  Infinity,  Infinity)
+        , n(-Infinity, -Infinity, -Infinity)
+    {}
 
-	Box(float minx, float miny, float minz, float maxx, float maxy, float maxz) {
-		m = Point(minx, miny, minz, 1);
-		n = Point(maxx, maxy, maxz, 1);
-	}
-
-    Box(Box const& b, Transform const& t) {
+    /*Box(Box const& b, Transform const& t) {
         Point o = t*b.m;
         Point v = t*(b.n-b.m);
         
@@ -49,7 +45,7 @@ struct Box {
         r.insert(o + Point(v.x,v.y,0,0));
         r.insert(o + Point(0,v.y,v.z,0));
         r.insert(o + Point(v.x,0,v.z,0));
-    }
+    }*/
 
 	bool intersect(Point const& o, Point const& id, const float t) const {
 		float lmin=0, lmax=t;
@@ -72,14 +68,16 @@ struct Box {
 		return lmin <= lmax;
 	}
 
-	void insert(Point const& p) {
+	Box& insert(P3 const& p) {
 		m = min(m, p);
 		n = max(n, p);
+        return *this;
 	}
 
-	void insert(Box const& b) {
+	Box& insert(Box const& b) {
 		m = min(m, b.m);
 		n = max(n, b.n);
+        return *this;
 	}
 } __attribute__ ((aligned));
 
@@ -88,14 +86,10 @@ struct BVH {
 	static const int K = 8;
 
 	struct Node {
-		float ax, ay, az;
-		float bx, by, bz;
+        Box box;
 		int begin, end;
-		Node(Box const& b, int begin, int end) : 
-			ax(b.m.x), ay(b.m.y), az(b.m.z), 
-			bx(b.n.x), by(b.n.y), bz(b.n.z), 
-			begin(begin), end(end) {}
-		Box box() const { return Box(ax, ay, az, bx, by, bz); }
+		Node(Box const& box, int begin, int end)
+            : box(box), begin(begin), end(end) {}
 	} __attribute__ ((aligned));
 
 	std::vector<int> o;
@@ -103,23 +97,35 @@ struct BVH {
 
 	struct State {
 		std::vector<Box> const& b;
-		std::vector<Point> const& c;
+		std::vector<P3> c;
 		std::vector<int> temp;
-		State(std::vector<Box> const& b, std::vector<Point> const& c) : b(b), c(c), temp(b.size()) {}
+		State(std::vector<Box> const& b, std::vector<P3> const& c) : b(b), c(c), temp(b.size()) {}
 	};
 
-	void construct(std::vector<Box> const& b, std::vector<Point> const& c) {
-		State state(b, c);
-		
-		// Reserve memory
+    Box const& root() const {
+        return n[0].box;
+    }
+
+	void construct(std::vector<Box> const& b) {
 		o.reserve(b.size());
 		n.reserve(2*b.size()-1);
 
-		// Initialize object references
-		for(size_t i = 0; i < b.size(); i++) o.push_back(i);
-
+        std::vector<P3> c;
 		Box vb, cb;
-		for(size_t i = 0; i < b.size(); i++) { vb.insert(b[i]); cb.insert(state.c[i]); }
+		for(size_t i = 0; i < b.size(); i++) {
+            P3 s( (b[i].m.x+b[i].n.x)*0.5,
+                  (b[i].m.y+b[i].n.y)*0.5,
+                  (b[i].m.z+b[i].n.z)*0.5 );
+
+            o.push_back(i);
+            c.push_back(s);
+
+            vb.insert(b[i]);
+            cb.insert(s);
+        }
+
+		State state(b, c);
+		
 		n.push_back(Node(vb, 0, o.size()));
 		construct(state, 0, vb, cb, 0, o.size());
 	}
@@ -135,14 +141,16 @@ struct BVH {
 		Box vbi[K];
 		Box cbi[K];
 
-		float k1 = 	d == 0 ? (K*0.9999)/(cb.n.x-cb.m.x) :
-				(d == 1 ? (K*0.9999)/(cb.n.y-cb.m.y) :
-					 (K*0.9999)/(cb.n.z-cb.m.z)) ;
+		float k1 = (K*0.9999) /
+                (d == 0 ? cb.n.x-cb.m.x :
+				(d == 1 ? cb.n.y-cb.m.y :
+					      cb.n.z-cb.m.z));
 			
 		for(int i = begin; i < end; ++i) {
-			int bin = d == 0 ? (state.c[o[i]].x-cb.m.x)*k1 :
-				  (d == 1 ? (state.c[o[i]].y-cb.m.y)*k1 :
-					   (state.c[o[i]].z-cb.m.z)*k1) ;
+			int bin = k1 *
+                  (d == 0 ? state.c[o[i]].x-cb.m.x :
+				  (d == 1 ? state.c[o[i]].y-cb.m.y :
+					        state.c[o[i]].z-cb.m.z));
 			ni[bin]++;
 			vbi[bin].insert(state.b[o[i]]);
 			cbi[bin].insert(state.c[o[i]]);

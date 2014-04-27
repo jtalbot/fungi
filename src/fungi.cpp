@@ -28,16 +28,15 @@ int time(lua_State* L)
 
 Shape* shape;
 
-std::vector<Point> makePoints(tinyobj::shape_t const& shape) {
-    std::vector<Point> points;
+std::vector<P3> makeVertexes(tinyobj::shape_t const& shape) {
+    std::vector<P3> vertexes;
     for(size_t f = 0; f < shape.mesh.positions.size(); f += 3) {
-        points.push_back(Point(
+        vertexes.push_back(P3(
             shape.mesh.positions[f+0],
             shape.mesh.positions[f+1],
-            shape.mesh.positions[f+2],
-            1));
+            shape.mesh.positions[f+2]));
     }
-    return points;
+    return vertexes;
 }
 
 std::vector<Mesh::Triangle> makeTriangles(tinyobj::shape_t const& shape) {
@@ -58,7 +57,7 @@ std::vector<Shape const*> makeShapes(std::vector<tinyobj::shape_t> const& shapes
 
     for(size_t i = 0; i < shapes.size(); ++i) {
         out.push_back(
-            new Mesh(makePoints(shapes[i]), makeTriangles(shapes[i])));
+            new Mesh(makeVertexes(shapes[i]), makeTriangles(shapes[i])));
     }
 	
     return out;
@@ -180,6 +179,7 @@ int main(int argc, char** argv) {
 
         report_errors(L, s);
         lua_close(L);
+        delete shape;
     }
 
 	return 0;

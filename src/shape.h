@@ -33,9 +33,7 @@ public:
         
         double t = 0;
 		std::vector<Box> b;
-		std::vector<Point> c;
 		b.reserve(shapes.size());
-		c.reserve(shapes.size());
         
         for(auto i = shapes.begin(); i != shapes.end(); ++i) {
             // area really should be scaled by transform...
@@ -44,10 +42,9 @@ public:
 			
             Box const& box = (*i)->bb();
 			b.push_back(box);
-			c.push_back((box.m + box.n)*0.5);
         }
 		
-		bvh.construct(b,c);
+		bvh.construct(b);
     }
 
 	~Group() {
@@ -57,7 +54,7 @@ public:
 	
 	bool min(Ray const& r, Dip& dip, float& t) const {
 		Point id(1.f/r.d.x, 1.f/r.d.y, 1.f/r.d.z, 0);
-		if(bvh.n[0].box().intersect(r.o, id, t)) {
+		if(bvh.root().intersect(r.o, id, t)) {
 			return minBVH(bvh.n[0], r, id, dip, t);
 		}
 		return false;
@@ -65,7 +62,7 @@ public:
 
 	bool any(Ray const& r, float t) const {
 		Point id(1.f/r.d.x, 1.f/r.d.y, 1.f/r.d.z, 0);
-		if(bvh.n[0].box().intersect(r.o, id, t)) {
+		if(bvh.root().intersect(r.o, id, t)) {
 			return anyBVH(bvh.n[0], r, id, t);
 		}
 		return false;
@@ -84,7 +81,7 @@ public:
     }
 
     Box bb() const {
-        return bvh.n[0].box();
+        return bvh.root();
     }
 
 	bool minBVH(BVH::Node const& node, Ray const& r, Point const& id, Dip& dip, float& t) const {
@@ -96,9 +93,9 @@ public:
 			return any;
 		}
 		else {
-			bool left = (bvh.n[node.begin].box().intersect(r.o, id, t) && 
+			bool left = (bvh.n[node.begin].box.intersect(r.o, id, t) && 
 					minBVH(bvh.n[node.begin], r, id, dip, t));
-			bool right = (bvh.n[node.begin+1].box().intersect(r.o, id, t) && 
+			bool right = (bvh.n[node.begin+1].box.intersect(r.o, id, t) && 
 					minBVH(bvh.n[node.begin+1], r, id, dip, t));
 			return left || right;
 		}
@@ -112,9 +109,9 @@ public:
 			return false;
 		}
 		else {
-			return 	(bvh.n[node.begin].box().intersect(r.o, id, t) && 
+			return 	(bvh.n[node.begin].box.intersect(r.o, id, t) && 
 					anyBVH(bvh.n[node.begin], r, id, t)) || 
-				(bvh.n[node.begin+1].box().intersect(r.o, id, t) && 
+				(bvh.n[node.begin+1].box.intersect(r.o, id, t) && 
 					anyBVH(bvh.n[node.begin+1], r, id, t));
 		}
 	}
@@ -130,97 +127,70 @@ private:
 class Mesh : public Shape {
 public:
 	struct Triangle {
-		unsigned int i0, i1, i2;
+		int a, b, c;
 
-        Triangle(unsigned int i0, unsigned int i1, unsigned int i2)
-            : i0(i0), i1(i1), i2(i2) {}
+        Triangle(int a, int b, int c)
+            : a(a), b(b), c(c) {}
 
-		bool any(Mesh const* mesh, Ray const& r, float& t) const {
-			Point const& p0 = mesh->vertexes[i0];
-			Point const& p1 = mesh->vertexes[i1];
-			Point const& p2 = mesh->vertexes[i2];
-			// subtracting p0 here is the same as asserting that m is affine!
-			// perhaps I should have an Affine Transform class?
-			Transform m(p1-p0, p2-p0, -r.d, Point(0,0,0,1));
-			Point i = m * (r.o-p0);
-			if(i.x >= 0 && i.y >= 0 && i.x+i.y < 1 && i.z > 0.00001f && i.z < t) {
-				t = i.z;
+		bool any(Mesh const& m, Ray const& r, float const t) const {
+			Point i = Transform(Point(m.v[b])-m.v[a], Point(m.v[c])-m.v[a], -r.d, Point(0,0,0,1)) * (r.o-m.v[a]);
+			return i.x >= 0 && i.y >= 0 && i.x+i.y < 1 &&
+                   i.z > 0.00001f && i.z < t;
+		}
+
+		bool min(Mesh const& m, Ray const& r, Dip& dip, float& t) const {
+			Transform x(Point(m.v[b])-m.v[a], Point(m.v[c])-m.v[a], -r.d, Point(0,0,0,1));
+			Point i = x * (r.o-m.v[a]);
+			if(i.x >= 0 && i.y >= 0 && i.x+i.y < 1 &&
+               i.z > 0.00001f && i.z < t) {
+                t = i.z;
+                dip = (Dip){
+                    m.v[a]*(1-i.x-i.y) + m.v[b]*i.x + m.v[c]*i.y,
+				    m.v[a]*m.v[b]*m.v[c] };
 				return true;
 			}
 			return false;
 		}
 
-		bool min(Mesh const* mesh, Ray const& r, Dip& dip, float& t) const {
-			Point const& p0 = mesh->vertexes[i0];
-			Point const& p1 = mesh->vertexes[i1];
-			Point const& p2 = mesh->vertexes[i2];
-			// subtracting p0 here is the same as asserting that m is affine!
-			// perhaps I should have an Affine Transform class?
-			Transform m(p1-p0, p2-p0, -r.d, Point(0,0,0,1));
-			Point i = m * (r.o-p0);
-			if(i.x >= 0 && i.y >= 0 && i.x+i.y < 1 && i.z > 0.00001f && i.z < t) {
-				t = i.z;
-				float x = i.x, y = i.y;
-				Plane p = mesh->vertexes[i0]*mesh->vertexes[i1]*mesh->vertexes[i2];
-				Point i = mesh->vertexes[i0]*(1-x-y) + mesh->vertexes[i1]*x + mesh->vertexes[i2]*y;
-				dip = (Dip){i, p};
-				return true;
-			}
-			return false;
-		}
+		Dip r(Mesh const& m) const {
+			// Use transform that maintains stratification
+            float u = gi_random(), v = gi_random();
+            Point i( (v>u) ? 0.5*u : u-0.5*v,
+                     (v>u) ? v-0.5*u : 0.5*v,
+                     0, 1 );
 
-		Dip r(Mesh const* mesh) const {
-			float u = gi_random(), v = gi_random();
-			Plane p = mesh->vertexes[i0]*mesh->vertexes[i1]*mesh->vertexes[i2];
-
-			// Transform that maintains stratification
-			float x = (v>u) ? 0.5*u : u-0.5*v;
-			float y = (v>u) ? v-0.5*u : 0.5*v;
-
-			//float x = (u+v > 1) ? 1-u : u;
-			//float y = (u+v > 1) ? 1-v : v;
-
-			Point i = mesh->vertexes[i0]*(1-x-y) + mesh->vertexes[i1]*x + mesh->vertexes[i2]*y;
-			Dip dip = {i, p};
+			Dip dip = {
+                m.v[a]*(1-i.x-i.y) + m.v[b]*i.x + m.v[c]*i.y,
+                m.v[a]*m.v[b]*m.v[c] };
 			return dip;
 		} 
 	};
 
 
-	Mesh(std::vector<Point> points, std::vector<Triangle> triangles)
-        : vertexes(points)
-        , triangles(triangles)
+	Mesh(std::vector<P3> vertexes, std::vector<Triangle> triangles)
+        : v(vertexes)
+        , m(triangles)
         , rays(0)
         , tritests(0)
         , bbtests(0) {
     
-        float t = 0;
+        float sum = 0;
 		std::vector<Box> b;
-		std::vector<Point> c;
-		b.reserve(triangles.size());
-		c.reserve(triangles.size());
-		for(auto i = triangles.begin(); i != triangles.end(); ++i) {
-		
-            Point const& v0 = vertexes[i->i0];
-		    Point const& v1 = vertexes[i->i1];
-		    Point const& v2 = vertexes[i->i2];
+		b.reserve(m.size());
 
-		    Plane p = v0*v1*v2;		// plane proportional to area.
-		    float a = sqrt(p.a*p.a + p.b*p.b + p.c*p.c);
+		for(auto i = m.begin(); i != m.end(); ++i) {
 		
-		    t += a;
-		    ecdf.push_back(t);
-		
-			Box box;
-			box.insert(v0);
-			box.insert(v1);
-			box.insert(v2);
-			b.push_back(box);
-			c.push_back((box.m + box.n)*0.5);
+		    sum += (v[i->a]*v[i->b]*v[i->c]).q();
+		    ecdf.push_back(sum);
+
+            b.push_back(Box()
+                .insert(v[i->a])
+                .insert(v[i->b])
+                .insert(v[i->c]));
 		}
 
         printf("Starting BVH\n");
-		bvh.construct(b,c);
+		bvh.construct(b);
 		printf("Ending BVH\n");
 	}
 
@@ -232,7 +202,7 @@ public:
 	bool min(Ray const& r, Dip& dip, float& t) const {
 		rays++;
 		Point id(1.f/r.d.x, 1.f/r.d.y, 1.f/r.d.z, 0);
-		if(bvh.n[0].box().intersect(r.o, id, t)) {
+		if(bvh.root().intersect(r.o, id, t)) {
 			return minBVH(bvh.n[0], r, id, dip, t);
 		}
 		return false;
@@ -241,7 +211,7 @@ public:
 	bool any(Ray const& r, float t) const {
 		rays++;
 		Point id(1.f/r.d.x, 1.f/r.d.y, 1.f/r.d.z, 0);
-		if(bvh.n[0].box().intersect(r.o, id, t)) {
+		if(bvh.root().intersect(r.o, id, t)) {
 			return anyBVH(bvh.n[0], r, id, t);
 		}
 		return false;
@@ -250,7 +220,7 @@ public:
 	Dip r() const {
 		float s = gi_random() * ecdf.back();
         size_t i = std::upper_bound(ecdf.begin(), ecdf.end(), s) - ecdf.begin();
-		Dip dip = triangles[i].r(this);
+		Dip dip = m[i].r(*this);
 		dip.p = dip.p * (ecdf.back() / ((i == 0) ? ecdf[0] : (ecdf[i]-ecdf[i-1])));
 		return dip;
 	}
@@ -260,7 +230,7 @@ public:
     }
 
     Box bb() const {
-        return bvh.n[0].box();
+        return bvh.root();
     }
 
 	bool minBVH(BVH::Node const& node, Ray const& r, Point const& id, Dip& dip, float& t) const {
@@ -268,15 +238,15 @@ public:
 			bool any = false;
 			for(int i = node.begin; i < node.end; i++) {
 				tritests++;
-				if(triangles[bvh.o[i]].min(this, r, dip, t)) any = true;
+				if(m[bvh.o[i]].min(*this, r, dip, t)) any = true;
 			}
 			return any;
 		}
 		else {
 			bbtests+=2;
-			bool left = (bvh.n[node.begin].box().intersect(r.o, id, t) && 
+			bool left = (bvh.n[node.begin].box.intersect(r.o, id, t) &&
 					minBVH(bvh.n[node.begin], r, id, dip, t));
-			bool right = (bvh.n[node.begin+1].box().intersect(r.o, id, t) && 
+			bool right = (bvh.n[node.begin+1].box.intersect(r.o, id, t) &&
 					minBVH(bvh.n[node.begin+1], r, id, dip, t));
 			return left || right;
 		}
@@ -286,23 +256,23 @@ public:
 		if(node.end > 0) {
 			for(int i = node.begin; i < node.end; i++) {
 				tritests++;
-				if(triangles[bvh.o[i]].any(this, r, t)) return true;
+				if(m[bvh.o[i]].any(*this, r, t)) return true;
 			}
 			return false;
 		}
 		else {
 			bbtests+=2;
-			return 	(bvh.n[node.begin].box().intersect(r.o, id, t) && 
+			return 	(bvh.n[node.begin].box.intersect(r.o, id, t) &&
 					anyBVH(bvh.n[node.begin], r, id, t)) || 
-				(bvh.n[node.begin+1].box().intersect(r.o, id, t) && 
+				(bvh.n[node.begin+1].box.intersect(r.o, id, t) &&
 					anyBVH(bvh.n[node.begin+1], r, id, t));
 		}
 	}
 
 private:
 
-	std::vector<Point> vertexes;
-	std::vector<Triangle> triangles;
+	std::vector<P3> v;        // vertices
+	std::vector<Triangle> m;  // triangles
 	BVH bvh;
 	
 	std::vector<float> ecdf;

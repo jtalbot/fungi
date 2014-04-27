@@ -17,6 +17,7 @@ SRC := fungi.cpp
 EXECUTABLE := fungi 
 
 OBJECTS := $(patsubst %.cpp,build/%.o,$(SRC))
+DEPENDENCIES := $(patsubst %.cpp,build/%.d,$(SRC))
 
 default: release 
 
@@ -37,7 +38,7 @@ build/%.o: src/%.cpp
 
 .PHONY: clean
 clean:
-	rm -rf $(EXECUTABLE) $(OBJECTS)
+	rm -rf $(EXECUTABLE) $(OBJECTS) $(DEPENDENCIES)
 
 # dependency rules
 build/%.d: src/%.cpp

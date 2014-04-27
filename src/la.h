@@ -24,8 +24,12 @@ struct Point {
 		return Point(-x, -y, -z, -w);
 	}
 
+    float q() const {
+		return sqrt(x*x+y*y+z*z);
+    }
+
 	Point operator~() const {
-		float s = 1./(x*x+y*y+z*z);
+		float s = 1./q();
 		return Point(x*s, y*s, z*s, w*s);
 	}
 	
@@ -49,9 +53,13 @@ struct Plane {
 		return Plane(a+o.a, b+o.b, c+o.c, d+o.d);
 	}
 
+    float q() const {
+        return sqrt(a*a+b*b+c*c);
+    }
+
 	Plane operator~() const {
-		float s = a*a+b*b+c*c;
-		return Plane(a/s, b/s, c/s, d/s);
+		float s = 1./q();
+		return Plane(a*s, b*s, c*s, d*s);
 	}
 
 	void print() const { printf("c(%f, %f, %f, %f)", a, b, c, d); }
@@ -86,9 +94,9 @@ inline Plane operator*(Line const& b, Point const& a) {
 inline Plane operator*(Point const& a, Line const& b) { return b*a; }
 
 
-// Transform from global space to local space 
+// Transforms 
 struct Transform {
-	float det;			// the determinant
+	float det;			        // the determinant
 	Plane m0, m1, m2, m3;		// the transformation matrix (stored by rows)
 	Point i0, i1, i2, i3;		// its inverse (stored by columns)
 
@@ -135,13 +143,13 @@ struct Transform {
 		Transform t;
 		t.det = 1.f/det;
 		t.m0 = Plane(i0.x, i1.x, i2.x, i3.x);
-		t.m1 = Plane(t.i0.y, t.i1.y, t.i2.y, t.i3.y);
-		t.m2 = Plane(t.i0.z, t.i1.z, t.i2.z, t.i3.z);
-		t.m3 = Plane(t.i0.w, t.i1.w, t.i2.w, t.i3.w);
-		t.i0 = Point(t.m0.a, t.m1.a, t.m2.a, t.m3.a);
-		t.i1 = Point(t.m0.b, t.m1.b, t.m2.b, t.m3.b);
-		t.i2 = Point(t.m0.c, t.m1.c, t.m2.c, t.m3.c);
-		t.i3 = Point(t.m0.d, t.m1.d, t.m2.d, t.m3.d);
+		t.m1 = Plane(i0.y, i1.y, i2.y, i3.y);
+		t.m2 = Plane(i0.z, i1.z, i2.z, i3.z);
+		t.m3 = Plane(i0.w, i1.w, i2.w, i3.w);
+		t.i0 = Point(m0.a, m1.a, m2.a, m3.a);
+		t.i1 = Point(m0.b, m1.b, m2.b, m3.b);
+		t.i2 = Point(m0.c, m1.c, m2.c, m3.c);
+		t.i3 = Point(m0.d, m1.d, m2.d, m3.d);
 		return t;
 	}
 
@@ -175,6 +183,37 @@ inline Transform operator*(Transform const& m, Transform const& n) {
 	t.det = m.det*n.det;
 	return t;
 }
+
+inline Point Trans(Plane const& p) {
+    return Point(p.a, p.b, p.c, p.d);
+}
+
+inline Plane Trans(Point const& p) {
+    return Plane(p.x, p.y, p.z, p.w);
+}
+
+struct P3 {
+    float x, y, z;
+
+    P3(float x, float y, float z) : x(x), y(y), z(z) {}
+    explicit P3(Point const& p) : x(p.x/p.w), y(p.y/p.w), z(p.z/p.w) {
+        if(p.w == 0) throw "Can't convert Point with w = 0 to a P3";
+    }
+    operator Point() const { return Point(x, y, z, 1.f); }
+};
+
+struct V3 {
+    float x, y, z;
+
+    V3(float x, float y, float z) : x(x), y(y), z(z) {}
+    explicit V3(Point const& p) : x(p.x), y(p.y), z(p.z) {
+        if(p.w != 0) throw "Can't convert Point with w != 0 to a V3";
+    }
+    operator Point() const { return Point(x, y, z, 0.f); }
+};
+
+
+
 
 #endif
 
