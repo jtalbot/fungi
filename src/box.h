@@ -32,21 +32,6 @@ struct Box {
         , n(-Infinity, -Infinity, -Infinity)
     {}
 
-    /*Box(Box const& b, Transform const& t) {
-        Point o = t*b.m;
-        Point v = t*(b.n-b.m);
-        
-        Box r;
-        r.insert(o);
-        r.insert(o + v);
-        r.insert(o + Point(v.x,0,0,0));
-        r.insert(o + Point(0,v.y,0,0));
-        r.insert(o + Point(0,0,v.z,0));
-        r.insert(o + Point(v.x,v.y,0,0));
-        r.insert(o + Point(0,v.y,v.z,0));
-        r.insert(o + Point(v.x,0,v.z,0));
-    }*/
-
 	bool intersect(Point const& o, Point const& id, const float t) const {
 		float lmin=0, lmax=t;
 	
@@ -80,6 +65,19 @@ struct Box {
         return *this;
 	}
 } __attribute__ ((aligned));
+
+inline Box operator*(Transform const& t, Box const& b) {
+    return Box()
+        .insert(P3(t * b.m))
+        .insert(P3(t * P3(b.n.x,b.m.y,b.m.z)))
+        .insert(P3(t * P3(b.m.x,b.n.y,b.m.z)))
+        .insert(P3(t * P3(b.m.x,b.m.y,b.n.z)))
+        .insert(P3(t * P3(b.n.x,b.n.y,b.m.z)))
+        .insert(P3(t * P3(b.m.x,b.n.y,b.n.z)))
+        .insert(P3(t * P3(b.n.x,b.m.y,b.n.z)))
+        .insert(P3(t * b.n));
+}
+
 
 struct BVH {
 	

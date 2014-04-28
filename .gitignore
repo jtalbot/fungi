@@ -1,5 +1,7 @@
 fungi
 papers
-scenes
 build
 output
+*.obj
+*.mtl
+*.swp

@@ -26,9 +26,53 @@ public:
     virtual Box bb() const = 0;
 };
 
+class Transformation : public Shape {
+public:
+    Transformation(Transform transform, Shape const* shape) 
+        : transform(transform)
+        , shape(shape) {}
+
+    ~Transformation() {
+        delete shape;
+    }
+
+    bool min(Ray const& r, Dip& dip, float& t) const {
+        bool out = shape->min(transform*r, dip, t);
+        if(out) {
+            dip = transform*dip;
+        }
+        return out;
+    }
+
+    bool any(Ray const& r, float t) const {
+        return shape->any(transform*r, t);
+    }
+
+    Dip r() const {
+        return (~transform) * shape->r();
+    }
+
+    float w() const {
+        // this is only true if the transform only uniformly scales...
+        // otherwise, it's only an approximation, which is fine,
+        // since it's only guiding our importance sampling.
+        // If the det is 0, then we need to up the weight to avoid
+        // biasing the results...
+        return maxf(transform.det, 0.00001) * shape->w();
+    }
+
+    Box bb() const {
+        return (~transform) * shape->bb();
+    }
+
+private:
+    Transform transform;
+    Shape const* shape;
+};
+
 class Group : public Shape {
 public:
-	Group(std::vector<Shape const*> shapes) 
+	Group(std::vector<Shape const*> shapes)
         : shapes(shapes) {
         
         double t = 0;

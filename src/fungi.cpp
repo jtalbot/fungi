@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <sys/time.h>
+#include <stack>
 
 #include <lua.hpp>
 
@@ -26,7 +27,66 @@ int time(lua_State* L)
 }
 
 
-Shape* shape;
+std::vector<Shape const*> all;
+std::stack<Transform> transforms;
+
+int scale(lua_State* L) {
+    int argc = lua_gettop(L);
+    if(argc != 3)
+        std::cerr << "scale takes 3 arguments" << std::endl;
+
+    double x = lua_tonumber(L, 1);
+    double y = lua_tonumber(L, 2);
+    double z = lua_tonumber(L, 3);
+
+    transforms.top() = Transform::Scale(x,y,z) * transforms.top();
+
+    return 0;
+}
+
+int translate(lua_State* L) {
+    int argc = lua_gettop(L);
+    if(argc != 3)
+        std::cerr << "translate takes 3 arguments" << std::endl;
+
+    double x = lua_tonumber(L, 1);
+    double y = lua_tonumber(L, 2);
+    double z = lua_tonumber(L, 3);
+
+    transforms.top() = Transform::Translate(x,y,z) * transforms.top();
+
+    return 0;
+}
+
+int rotatex(lua_State* L) {
+    int argc = lua_gettop(L);
+    if(argc != 1)
+        std::cerr << "rotatex takes 1 argument" << std::endl;
+
+    double r = lua_tonumber(L, 1);
+    transforms.top() = Transform::RotateX(r) * transforms.top();
+    return 0;
+}
+
+int rotatey(lua_State* L) {
+    int argc = lua_gettop(L);
+    if(argc != 1)
+        std::cerr << "rotatey takes 1 argument" << std::endl;
+
+    double r = lua_tonumber(L, 1);
+    transforms.top() = Transform::RotateY(r) * transforms.top();
+    return 0;
+}
+
+int rotatez(lua_State* L) {
+    int argc = lua_gettop(L);
+    if(argc != 1)
+        std::cerr << "rotatez takes 1 argument" << std::endl;
+
+    double r = lua_tonumber(L, 1);
+    transforms.top() = Transform::RotateZ(r) * transforms.top();
+    return 0;
+}
 
 std::vector<P3> makeVertexes(tinyobj::shape_t const& shape) {
     std::vector<P3> vertexes;
@@ -78,7 +138,8 @@ int object(lua_State* L) {
         exit(1);
     }
 
-    shape = new Group( makeShapes(shapes) );
+    all.push_back(new Transformation( 
+        transforms.top(), new Group( makeShapes(shapes) ) ));
     return 0;
 }
 
@@ -88,7 +149,8 @@ int render(lua_State* L) {
         std::cerr << "render(filename) -- takes a single argument" << std::endl;
 
     std::string filename = lua_tostring(L, 1);
-    
+   
+    Shape const* shape = new Group(all);
     Pinhole c(Point(0,-30,-200,1), 1);
 	const int width = 750, height = 500;
 	Sensor s(width,height,2);
@@ -138,11 +200,17 @@ int render(lua_State* L) {
 			    s.detect(x,y, 625, 1000*g);
             }
 		}
+        else {
+            float x,y;
+		    c.project(ray, x, y);
+            s.detect(x,y,500,300);
+        }
 		
 		//if(i%1000000==0) printf("%d\n",i);
 	}
 	
 	s.outputEXR(filename);
+    delete shape;
 
     return 0;
 }
@@ -157,6 +225,8 @@ void report_errors(lua_State* L, int status)
 
 int main(int argc, char** argv) {
 
+    transforms.push(Transform::Identity());
+
     for ( int n=1; n<argc; ++n ) {
         const char* file = argv[n];
 
@@ -165,6 +235,11 @@ int main(int argc, char** argv) {
         luaL_openlibs(L);
 
         lua_register(L, "time", time);
+        lua_register(L, "scale", scale);
+        lua_register(L, "translate", translate);
+        lua_register(L, "rotatex", rotatex);
+        lua_register(L, "rotatey", rotatey);
+        lua_register(L, "rotatez", rotatez);
         lua_register(L, "obj", object);
         lua_register(L, "render", render);
 
@@ -179,7 +254,6 @@ int main(int argc, char** argv) {
 
         report_errors(L, s);
         lua_close(L);
-        delete shape;
     }
 
 	return 0;
