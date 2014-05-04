@@ -18,10 +18,11 @@ Ray operator*(Transform const& t, Ray const& r) {
 struct Dip {
 	Point i;
 	Plane p;
+    bool light;
 };
 
 Dip operator*(Transform const& t, Dip const& d) {
-    return (Dip){(~t)*d.i, d.p*(~t)};
+    return (Dip){t*d.i, d.p*t, d.light};
 }
 
 #endif

@@ -29,6 +29,18 @@ int time(lua_State* L)
 
 std::vector<Shape const*> all;
 std::stack<Transform> transforms;
+bool islight = false;
+
+
+int push(lua_State* L) {
+    transforms.push(transforms.top());
+    return 0;
+}
+
+int pop(lua_State* L) {
+    transforms.pop();
+    return 0;
+}
 
 int scale(lua_State* L) {
     int argc = lua_gettop(L);
@@ -116,8 +128,9 @@ std::vector<Shape const*> makeShapes(std::vector<tinyobj::shape_t> const& shapes
     std::vector<Shape const*> out;
 
     for(size_t i = 0; i < shapes.size(); ++i) {
-        out.push_back(
-            new Mesh(makeVertexes(shapes[i]), makeTriangles(shapes[i])));
+        Mesh* m = new Mesh(makeVertexes(shapes[i]), makeTriangles(shapes[i]));
+        m->light = islight;
+        out.push_back(m);
     }
 	
     return out;
@@ -140,15 +153,22 @@ int object(lua_State* L) {
 
     all.push_back(new Transformation( 
         transforms.top(), new Group( makeShapes(shapes) ) ));
+    
+    return 0;
+}
+
+int light(lua_State* L) {
+    islight = true;
     return 0;
 }
 
 int render(lua_State* L) {
     int argc = lua_gettop(L);
-    if(argc != 1)
-        std::cerr << "render(filename) -- takes a single argument" << std::endl;
+    if(argc != 3)
+        std::cerr << "render(filename) -- takes three arguments" << std::endl;
 
-    std::string filename = lua_tostring(L, 1);
+    const int64_t samples = (int64_t)lua_tonumber(L, 1);
+    std::string filename = lua_tostring(L, 2);
    
     Shape const* shape = new Group(all);
     Pinhole c(Point(0,-30,-200,1), 1);
@@ -156,9 +176,7 @@ int render(lua_State* L) {
 	Sensor s(width,height,2);
 	PointLight light(Point(150,150,-150,1));
 
-	const int samples = 100000000;
-	
-	for(int i = 0; i < samples; i++) {
+	for(int64_t i = 0; i < samples; i++) {
 		//Dip p0 = c.sample();
 		//Dip p1 = mesh.sample();
 		//Point p2 = light.sample();
@@ -184,9 +202,9 @@ int render(lua_State* L) {
             float x,y;
 		    c.project(ray, x, y);
         	
-		    Point p2 = light.sample();
-            Ray ray2 = {p1.i, p2-p1.i};	
-
+		    //Point p2 = light.sample();
+            p2 = shape->r();
+            Ray ray2 = {p1.i, p2.i-p1.i};	
 			// sample circle
 			//float u = gi_random()*2*PI; 
 			//float v = gi_random();
@@ -194,10 +212,10 @@ int render(lua_State* L) {
 			//float y = sin(y)*v;
 			//float z = sqrt(1-v);
 			//out = f*Point(0,-1,0,0) + u*Point(1,0,0,0) + v*Point(0,0,1,0);
-		
-            if(!shape->any(ray2, Infinity)) {
-                float g = maxf(((~p1.p)*(~ray2.d)),0);
-			    s.detect(x,y, 625, 1000*g);
+            if(/*p2.light &&*/ !shape->any(ray2, 0.9999)) {
+                float g = maxf(((~p1.p)*(~ray2.d)),0)
+                        * maxf(((~p2.p)*-(~ray2.d)),0);
+			    s.detect(x,y, 625, 10000*g);
             }
 		}
         else {
@@ -205,11 +223,31 @@ int render(lua_State* L) {
 		    c.project(ray, x, y);
             s.detect(x,y,500,300);
         }
-		
+	
+        if(i%100000==0) {
+            lua_pushvalue(L, 3);
+            lua_pushnumber(L, (lua_Number)i);
+            if( lua_pcall(L, 1, 1, 0) != 0 )
+                std::cerr << "Error calling status function: " << lua_tostring(L, -1) << std::endl;
+            bool cont = lua_toboolean(L, -1);
+            lua_pop(L, 1);
+            if(!cont)
+                break;
+        }
 		//if(i%1000000==0) printf("%d\n",i);
 	}
+
+    {
+        lua_pushvalue(L, 3);
+        lua_pushnumber(L, (lua_Number)samples);
+        if( lua_pcall(L, 1, 1, 0) != 0 )
+            std::cerr << "Error calling status function: " << lua_tostring(L, -1) << std::endl;
+        lua_pop(L, 1);
+    }
 	
 	s.outputEXR(filename);
+
+    printf("\n");
     delete shape;
 
     return 0;
@@ -225,6 +263,8 @@ void report_errors(lua_State* L, int status)
 
 int main(int argc, char** argv) {
 
+    srand(1);
+
     transforms.push(Transform::Identity());
 
     for ( int n=1; n<argc; ++n ) {
@@ -236,11 +276,14 @@ int main(int argc, char** argv) {
 
         lua_register(L, "time", time);
         lua_register(L, "scale", scale);
+        lua_register(L, "push", push);
+        lua_register(L, "pop", pop);
         lua_register(L, "translate", translate);
         lua_register(L, "rotatex", rotatex);
         lua_register(L, "rotatey", rotatey);
         lua_register(L, "rotatez", rotatez);
         lua_register(L, "obj", object);
+        lua_register(L, "light", light);
         lua_register(L, "render", render);
 
         std::cerr << "Running: " << file << std::endl;

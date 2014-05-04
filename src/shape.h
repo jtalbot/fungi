@@ -15,6 +15,8 @@ inline float gi_random() {
 
 class Shape {
 public:
+    Shape() : light(false) {}
+
     virtual ~Shape() {}
 
     virtual bool min(Ray const& r, Dip& dip, float& t) const = 0;
@@ -24,13 +26,17 @@ public:
     virtual float w() const = 0;
 
     virtual Box bb() const = 0;
+
+    bool light;
 };
 
 class Transformation : public Shape {
 public:
     Transformation(Transform transform, Shape const* shape) 
         : transform(transform)
-        , shape(shape) {}
+        , shape(shape) {
+        light = shape->light;
+    }
 
     ~Transformation() {
         delete shape;
@@ -39,7 +45,7 @@ public:
     bool min(Ray const& r, Dip& dip, float& t) const {
         bool out = shape->min(transform*r, dip, t);
         if(out) {
-            dip = transform*dip;
+            dip = (~transform)*dip;
         }
         return out;
     }
@@ -58,7 +64,7 @@ public:
         // since it's only guiding our importance sampling.
         // If the det is 0, then we need to up the weight to avoid
         // biasing the results...
-        return maxf(transform.det, 0.00001) * shape->w();
+        return maxf((~transform).det, 0.00001) * shape->w();
     }
 
     Box bb() const {
@@ -81,8 +87,10 @@ public:
         
         for(auto i = shapes.begin(); i != shapes.end(); ++i) {
             // area really should be scaled by transform...
-		    t += (*i)->w();
+		    t += (*i)->light*(*i)->w();
 		    ecdf.push_back(t);
+
+            light |= (*i)->light;
 			
             Box const& box = (*i)->bb();
 			b.push_back(box);
@@ -190,7 +198,8 @@ public:
                 t = i.z;
                 dip = (Dip){
                     m.v[a]*(1-i.x-i.y) + m.v[b]*i.x + m.v[c]*i.y,
-				    m.v[a]*m.v[b]*m.v[c] };
+				    m.v[a]*m.v[b]*m.v[c],
+                    m.light };
 				return true;
 			}
 			return false;
@@ -205,7 +214,8 @@ public:
 
 			Dip dip = {
                 m.v[a]*(1-i.x-i.y) + m.v[b]*i.x + m.v[c]*i.y,
-                m.v[a]*m.v[b]*m.v[c] };
+                m.v[a]*m.v[b]*m.v[c],
+                m.light };
 			return dip;
 		} 
 	};
@@ -325,6 +335,7 @@ private:
 	mutable int tritests;
 	mutable int bbtests;
 };
+
 
 #endif
 
