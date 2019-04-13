@@ -29,8 +29,7 @@ void Sensor::outputEXR(std::string const& filename) {
 #include "tinyexr.h"
 
 // See `examples/rgbe2exr/` for more details.
-void Sensor::outputEXR(std::string const& filename)
-{
+void Sensor::outputEXR(std::string const& filename) {
     EXRHeader header;
     InitEXRHeader(&header);
 
@@ -39,7 +38,7 @@ void Sensor::outputEXR(std::string const& filename)
 
     image.num_channels = 3;
 
-    int64_t pixels = xres*yres;
+    int64_t pixels = xres * yres;
 
     std::vector<float> images[3];
     images[0].resize(pixels);
@@ -47,46 +46,54 @@ void Sensor::outputEXR(std::string const& filename)
     images[2].resize(pixels);
 
     // Split RGBRGBRGB... into R, G and B layer
-    float s = ((float)xres*yres)/samples;
+    float s = ((float)xres * yres) / samples;
     for (int i = 0; i < pixels; i++) {
-      images[0][i] = array[i].sum.r * s;
-      images[1][i] = array[i].sum.g * s;
-      images[2][i] = array[i].sum.b * s;
+        images[0][i] = array[i].sum.r * s;
+        images[1][i] = array[i].sum.g * s;
+        images[2][i] = array[i].sum.b * s;
     }
 
     float* image_ptr[3];
-    image_ptr[0] = &(images[2].at(0)); // B
-    image_ptr[1] = &(images[1].at(0)); // G
-    image_ptr[2] = &(images[0].at(0)); // R
+    image_ptr[0] = &(images[2].at(0));  // B
+    image_ptr[1] = &(images[1].at(0));  // G
+    image_ptr[2] = &(images[0].at(0));  // R
 
     image.images = (unsigned char**)image_ptr;
     image.width = xres;
     image.height = yres;
 
     header.num_channels = 3;
-    header.channels = (EXRChannelInfo *)malloc(sizeof(EXRChannelInfo) * header.num_channels); 
-    // Must be (A)BGR order, since most of EXR viewers expect this channel order.
-    strncpy(header.channels[0].name, "B", 255); header.channels[0].name[strlen("B")] = '\0';
-    strncpy(header.channels[1].name, "G", 255); header.channels[1].name[strlen("G")] = '\0';
-    strncpy(header.channels[2].name, "R", 255); header.channels[2].name[strlen("R")] = '\0';
+    header.channels =
+        (EXRChannelInfo*)malloc(sizeof(EXRChannelInfo) * header.num_channels);
+    // Must be (A)BGR order, since most of EXR viewers expect this channel
+    // order.
+    strncpy(header.channels[0].name, "B", 255);
+    header.channels[0].name[strlen("B")] = '\0';
+    strncpy(header.channels[1].name, "G", 255);
+    header.channels[1].name[strlen("G")] = '\0';
+    strncpy(header.channels[2].name, "R", 255);
+    header.channels[2].name[strlen("R")] = '\0';
 
-    header.pixel_types = (int *)malloc(sizeof(int) * header.num_channels); 
-    header.requested_pixel_types = (int *)malloc(sizeof(int) * header.num_channels);
+    header.pixel_types = (int*)malloc(sizeof(int) * header.num_channels);
+    header.requested_pixel_types =
+        (int*)malloc(sizeof(int) * header.num_channels);
     for (int i = 0; i < header.num_channels; i++) {
-      header.pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT; // pixel type of input image
-      header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_HALF; // pixel type of output image to be stored in .EXR
+        header.pixel_types[i] =
+            TINYEXR_PIXELTYPE_FLOAT;  // pixel type of input image
+        header.requested_pixel_types[i] =
+            TINYEXR_PIXELTYPE_HALF;  // pixel type of output image to be stored
+                                     // in .EXR
     }
 
-    const char* err = NULL; // or nullptr in C++11 or later.
+    const char* err = NULL;  // or nullptr in C++11 or later.
     int ret = SaveEXRImageToFile(&image, &header, filename.c_str(), &err);
     if (ret != TINYEXR_SUCCESS) {
-      fprintf(stderr, "Save EXR err: %s\n", err);
-      FreeEXRErrorMessage(err); // free's buffer for an error message 
+        fprintf(stderr, "Save EXR err: %s\n", err);
+        FreeEXRErrorMessage(err);  // free's buffer for an error message
     }
-    //printf("Saved exr file. [ %s ] \n", filename.c_str());
+    // printf("Saved exr file. [ %s ] \n", filename.c_str());
 
     free(header.channels);
     free(header.pixel_types);
     free(header.requested_pixel_types);
 }
-

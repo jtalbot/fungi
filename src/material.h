@@ -5,159 +5,136 @@
 
 #include "color.h"
 #include "la.h"
-#include "sample.h"
 #include "ray.h"
+#include "sample.h"
 
-class Texture
-{
-public:
+class Texture {
+   public:
     virtual ~Texture() {}
     virtual rgba eval(P2 const& uv) const = 0;
 };
 
-class ConstantTexture : public Texture
-{
-public:
+class ConstantTexture : public Texture {
+   public:
     ConstantTexture(rgba v) : v(v) {}
 
-    rgba eval(P2 const& uv) const override final
-    {
-        return v;
-    }
+    rgba eval(P2 const& uv) const override final { return v; }
 
-private:
+   private:
     const rgba v;
 };
 
-class ScaleTexture : public Texture
-{
-public:
+class ScaleTexture : public Texture {
+   public:
     ScaleTexture(std::shared_ptr<Texture const> a,
-                 std::shared_ptr<Texture const> b) : a(a), b(b) {}
+                 std::shared_ptr<Texture const> b)
+        : a(a), b(b) {}
 
-    rgba eval(P2 const& uv) const override final
-    {
-        return a->eval(uv)*b->eval(uv);
+    rgba eval(P2 const& uv) const override final {
+        return a->eval(uv) * b->eval(uv);
     }
 
-private:
+   private:
     const std::shared_ptr<Texture const> a, b;
 };
 
-class MixTexture : public Texture
-{
-public:
+class MixTexture : public Texture {
+   public:
     MixTexture(std::shared_ptr<Texture const> a,
                std::shared_ptr<Texture const> b,
-               std::shared_ptr<Texture const> m
-               ) : a(a), b(b), m(m) {}
+               std::shared_ptr<Texture const> m)
+        : a(a), b(b), m(m) {}
 
-    rgba eval(P2 const& uv) const override final
-    {
+    rgba eval(P2 const& uv) const override final {
         auto f = m->eval(uv);
-        return (rgba(1,1,1,1)+f*-1)*a->eval(uv) + f*b->eval(uv);
+        return (rgba(1, 1, 1, 1) + f * -1) * a->eval(uv) + f * b->eval(uv);
     }
 
-private:
+   private:
     const std::shared_ptr<Texture const> a, b, m;
 };
 
-
-class ImageTexture : public Texture
-{
-public:
+class ImageTexture : public Texture {
+   public:
     ImageTexture(std::string const& filename);
     rgba eval(P2 const& uv) const override final;
 
-private:
+   private:
     class Impl;
     const std::shared_ptr<Impl const> a;
 };
 
-
-class Material
-{
-public:
+class Material {
+   public:
     virtual ~Material() {}
     virtual rgba eval(P2 const& uv) const = 0;
     virtual std::pair<rgba, V3> sample(Dip const& dip, V3 const& in) const = 0;
 };
 
-class MixMaterial : public Material
-{
-public:
-    MixMaterial(std::shared_ptr<Texture const> amount, std::shared_ptr<Material const> a, std::shared_ptr<Material const> b)
+class MixMaterial : public Material {
+   public:
+    MixMaterial(std::shared_ptr<Texture const> amount,
+                std::shared_ptr<Material const> a,
+                std::shared_ptr<Material const> b)
         : amount(amount), a(a), b(b) {}
 
-    rgba eval(P2 const& uv) const override final
-    {
+    rgba eval(P2 const& uv) const override final {
         rgba f = amount->eval(uv);
-        return (rgba(1,1,1,1)+f*-1)*a->eval(uv) + f*b->eval(uv);
+        return (rgba(1, 1, 1, 1) + f * -1) * a->eval(uv) + f * b->eval(uv);
     }
 
-    std::pair<rgba, V3> sample(Dip const& dip, V3 const& in) const override final
-    {
+    std::pair<rgba, V3> sample(Dip const& dip,
+                               V3 const& in) const override final {
         rgba f = amount->eval(dip.uv);
-        return (f.r < gi_random())
-            ? a->sample(dip, in)
-            : b->sample(dip, in);
+        return (f.r < gi_random()) ? a->sample(dip, in) : b->sample(dip, in);
     }
-private:
+
+   private:
     const std::shared_ptr<Texture const> amount;
     const std::shared_ptr<Material const> a, b;
 };
 
-class BumpMaterial : public Material
-{
-public:
-    BumpMaterial(std::shared_ptr<Texture const> bumpMap, std::shared_ptr<Material const> m)
+class BumpMaterial : public Material {
+   public:
+    BumpMaterial(std::shared_ptr<Texture const> bumpMap,
+                 std::shared_ptr<Material const> m)
         : bumpMap(bumpMap), m(m) {}
 
     rgba eval(P2 const& uv) const override final;
 
-    std::pair<rgba, V3> sample(Dip const& dip, V3 const& in) const override final;
+    std::pair<rgba, V3> sample(Dip const& dip,
+                               V3 const& in) const override final;
 
-private:
+   private:
     const std::shared_ptr<Texture const> bumpMap;
     const std::shared_ptr<Material const> m;
 };
 
-class DiffuseMaterial : public Material
-{
-public:
-    DiffuseMaterial(std::shared_ptr<Texture const> kd)
-        : kd(kd)
-    {}
+class DiffuseMaterial : public Material {
+   public:
+    DiffuseMaterial(std::shared_ptr<Texture const> kd) : kd(kd) {}
 
-    rgba eval(P2 const& uv) const override final
-    {
-        return kd->eval(uv);
-    }
+    rgba eval(P2 const& uv) const override final { return kd->eval(uv); }
 
-    std::pair<rgba, V3> sample(Dip const& dip, V3 const& in) const override final;
+    std::pair<rgba, V3> sample(Dip const& dip,
+                               V3 const& in) const override final;
 
-private:
+   private:
     const std::shared_ptr<Texture const> kd;
 };
 
-class GlassMaterial : public Material
-{
-public:
-    GlassMaterial(
-            std::shared_ptr<Texture const> Kr,
-            std::shared_ptr<Texture const> Kt)
-        : Kr(Kr)
-        , Kt(Kt)
-        , eta(1.5)
-    {}
+class GlassMaterial : public Material {
+   public:
+    GlassMaterial(std::shared_ptr<Texture const> Kr,
+                  std::shared_ptr<Texture const> Kt)
+        : Kr(Kr), Kt(Kt), eta(1.5) {}
 
-    rgba eval(P2 const& uv) const override final
-    {
-        return rgba(0,0,0,0);
-    }
+    rgba eval(P2 const& uv) const override final { return rgba(0, 0, 0, 0); }
 
-    std::pair<rgba, V3> sample(Dip const& dip, V3 const& in) const override final; 
-private:
+    std::pair<rgba, V3> sample(Dip const& dip,
+                               V3 const& in) const override final;
+
+   private:
     const std::shared_ptr<Texture const> Kr, Kt;
     const float eta;
 };

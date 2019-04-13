@@ -1,45 +1,36 @@
 
 #pragma once
 
-#include "ray.h"
 #include "color.h"
 #include "la.h"
 #include "ray.h"
 
-class Light
-{
-public:
+class Light {
+   public:
     virtual ~Light() {}
-    
-    //Point sample() const;
+
+    // Point sample() const;
     virtual rgba eval(Point const&) const = 0;
 
     virtual std::pair<rgba, Point> sample(Dip const&) const = 0;
 };
 
-class PointLight : public Light
-{
-public:
+class PointLight : public Light {
+   public:
+    PointLight(Point p) : p(p) {}
 
-	PointLight(Point p) : p(p) {}
+    rgba eval(Point const&) const override final { return rgba(1, 1, 1, 1); }
 
-    rgba eval(Point const&) const override final
-    {
-        return rgba(1,1,1,1);
+    std::pair<rgba, Point> sample(Dip const&) const override final {
+        return std::make_pair(rgba(1, 1, 1, 1), p);
     }
 
-	std::pair<rgba, Point> sample(Dip const&) const override final
-    {
-        return std::make_pair(rgba(1,1,1,1), p);
-    }
-
-private:
-	Point p;
+   private:
+    Point p;
 };
 
-class InfiniteAreaLight : public Light
-{
-public:
+class InfiniteAreaLight : public Light {
+   public:
     InfiniteAreaLight(rgba l, std::string const& filename);
 
     ~InfiniteAreaLight() override final;
@@ -48,7 +39,7 @@ public:
 
     std::pair<rgba, Point> sample(Dip const&) const override final;
 
-private:
+   private:
     const rgba l;
     float* data;
     int width;
@@ -60,4 +51,3 @@ private:
     void readExr(std::string const& filename);
     void buildDistribution();
 };
-

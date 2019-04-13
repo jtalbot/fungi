@@ -3,4 +3,3 @@
 #include "catch.hpp"
 
 // No tests here
-
