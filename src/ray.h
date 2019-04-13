@@ -1,6 +1,5 @@
 
-#ifndef _RAY_H_
-#define _RAY_H_
+#pragma once
 
 #include <vector>
 #include <algorithm>
@@ -11,19 +10,20 @@ struct Ray {
 	Point o, d;
 } __attribute__ ((aligned));
 
-Ray operator*(Transform const& t, Ray const& r) {
+inline Ray operator*(Transform const& t, Ray const& r) {
     return (Ray){t*r.o, t*r.d};
 }
 
 struct Dip {
 	Point i;
 	Plane p;
-    bool light;
+    V3 n;
+    P2 uv;
+    V3 didu, didv;
+    P2 dtdu, dtdv;
 };
 
-Dip operator*(Transform const& t, Dip const& d) {
-    return (Dip){t*d.i, d.p*t, d.light};
+inline Dip operator*(Transform const& t, Dip const& d) {
+    return (Dip){t*d.i, d.p*t, d.n, d.uv, V3(t*d.didu), V3(t*d.didv), d.dtdu, d.dtdv};
 }
-
-#endif
 

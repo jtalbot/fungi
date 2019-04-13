@@ -5,7 +5,7 @@
 #include <limits>
 #include "la.h"
 
-#define Infinity (std::numeric_limits<float>::infinity())
+/*#define Infinity (std::numeric_limits<float>::infinity())
 
 inline float minf(const float a, const float b) {
 	return a < b ? a : b;
@@ -21,10 +21,10 @@ inline P3 min(P3 const& p0, P3 const& p1) {
 
 inline P3 max(P3 const& p0, P3 const& p1) {
 	return P3(maxf(p0.x, p1.x), maxf(p0.y, p1.y), maxf(p0.z, p1.z));
-}
+}*/
 
-struct Box {
-
+struct Box
+{
 	P3 m,n;
 
 	Box()
@@ -32,7 +32,8 @@ struct Box {
         , n(-Infinity, -Infinity, -Infinity)
     {}
 
-	bool intersect(Point const& o, Point const& id, const float t) const {
+	bool intersect(Point const& o, Point const& id, const float t) const
+    {
 		float lmin=0, lmax=t;
 	
 		const float xa = (m.x-o.x)*id.x;
@@ -53,20 +54,23 @@ struct Box {
 		return lmin <= lmax;
 	}
 
-	Box& insert(P3 const& p) {
+	Box& insert(P3 const& p)
+    {
 		m = min(m, p);
 		n = max(n, p);
         return *this;
 	}
 
-	Box& insert(Box const& b) {
+	Box& insert(Box const& b)
+    {
 		m = min(m, b.m);
 		n = max(n, b.n);
         return *this;
 	}
 } __attribute__ ((aligned));
 
-inline Box operator*(Transform const& t, Box const& b) {
+inline Box operator*(Transform const& t, Box const& b)
+{
     return Box()
         .insert(P3(t * b.m))
         .insert(P3(t * P3(b.n.x,b.m.y,b.m.z)))
@@ -79,8 +83,8 @@ inline Box operator*(Transform const& t, Box const& b) {
 }
 
 
-struct BVH {
-	
+struct BVH
+{
 	static const int K = 8;
 
 	struct Node {
@@ -104,7 +108,8 @@ struct BVH {
         return n[0].box;
     }
 
-	void construct(std::vector<Box> const& b) {
+	void construct(std::vector<Box> const& b)
+    {
 		o.reserve(b.size());
 		n.reserve(2*b.size()-1);
 
@@ -128,7 +133,8 @@ struct BVH {
 		construct(state, 0, vb, cb, 0, o.size());
 	}
 
-	void construct(State& state, int nindex, Box const& vb, Box const& cb, int begin, int end) {
+	void construct(State& state, int nindex, Box const& vb, Box const& cb, int begin, int end)
+    {
 		int d;	
 		// check termination conditions
 		if(end-begin <= 2 || (d = dim(vb, cb)) < 0) {
@@ -231,7 +237,7 @@ struct BVH {
 	}
 
 	float area(Box const& b) {
-		return 	(b.n.x-b.m.x)*(b.n.y-b.m.y) +
+		return (b.n.x-b.m.x)*(b.n.y-b.m.y) +
 			(b.n.x-b.m.x)*(b.n.z-b.m.z) +
 			(b.n.z-b.m.z)*(b.n.y-b.m.y);
 	}

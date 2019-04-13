@@ -7,8 +7,8 @@ end
 
 local load0 = time()
     translate(-10,5,0)
-    rotatey(math.pi/10)
-    rotatez(-math.pi/10)
+    --rotatey(math.pi/10)
+    --rotatez(-math.pi/10)
     push()
         obj("scenes/xyzrgb_dragon.obj")
         translate(0,-40.5,0)

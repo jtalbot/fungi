@@ -1,6 +1,5 @@
 
-#ifndef FUNGI_CL_COLOR_H
-#define FUNGI_CL_COLOR_H
+#pragma once
 
 struct rgba {
 	double r, g, b, a;
@@ -14,12 +13,21 @@ struct rgba {
 		return rgba(r*s, g*s, b*s, a*s); 
 	}
 
+	rgba operator*(rgba const& o) const {
+		return rgba(r*o.r, g*o.g, b*o.b, a*o.a); 
+	}
+
 	rgba operator+(rgba const& o) const {
 		return rgba(r+o.r, g+o.g, b+o.b, a+o.a);
 	}
 	
 	rgba& operator+=(rgba const& o) {
 		r += o.r; g += o.g; b += o.b; a += o.a;
+	    return *this;
+    }
+	
+    rgba& operator*=(rgba const& o) {
+		r *= o.r; g *= o.g; b *= o.b; a *= o.a;
 	    return *this;
     }
 };
@@ -338,5 +346,3 @@ struct Spectrum {
 	double spectrum[longestWavelength-shortestWavelength];
 };
 	
-
-#endif //FUNGI_CL_COLOR_H

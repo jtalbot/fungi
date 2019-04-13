@@ -1,6 +1,5 @@
 
-#ifndef _CAMERA_H
-#define _CAMERA_H
+#pragma once
 
 struct Pinhole {
 	Point l;
@@ -24,11 +23,14 @@ struct Pinhole {
 		out = f*Point(0,0,1,0) + u*Point(1,0,0,0) + v*Point(0,1,0,0);
 	};
 
-	void project(Ray const& r, float& x, float&y) const {
-		x = -r.d.x/r.d.z * f;
-		y = -r.d.y/r.d.z * f;
-	}	
-};
+    void sample(P2 const& sensor, Dip& dip, Point& out) const {
+        dip = (Dip){l, ip};
+		out = f*Point(0,0,1,0) + sensor.u*Point(1,0,0,0) + sensor.v*Point(0,1,0,0);
+    }
 
-#endif
+	/*void project(Ray const& r, float& x, float&y) const {
+		x = r.d.x/r.d.z * f;
+		y = r.d.y/r.d.z * f;
+	}*/	
+};
 

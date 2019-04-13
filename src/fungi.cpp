@@ -14,8 +14,13 @@
 #include "sensor.h"
 #include "camera.h"
 #include "light.h"
+#include "scene.h"
 
 #include "tiny_obj_loader.cc"
+
+void parsePBRT(std::string const& file);
+
+void registerAPI(lua_State* L);
 
 int time(lua_State* L)
 {
@@ -26,8 +31,10 @@ int time(lua_State* L)
   return 1;
 }
 
-
+std::shared_ptr<Scene> scene;
 std::vector<Shape const*> all;
+Transform cameraTransform;
+
 std::stack<Transform> transforms;
 bool islight = false;
 
@@ -102,6 +109,7 @@ int rotatez(lua_State* L) {
 
 std::vector<P3> makeVertexes(tinyobj::shape_t const& shape) {
     std::vector<P3> vertexes;
+    vertexes.reserve(shape.mesh.positions.size()/3);
     for(size_t f = 0; f < shape.mesh.positions.size(); f += 3) {
         vertexes.push_back(P3(
             shape.mesh.positions[f+0],
@@ -113,6 +121,7 @@ std::vector<P3> makeVertexes(tinyobj::shape_t const& shape) {
 
 std::vector<Mesh::Triangle> makeTriangles(tinyobj::shape_t const& shape) {
     std::vector<Mesh::Triangle> triangles;
+    triangles.reserve(shape.mesh.indices.size()/3);
     for(size_t f = 0; f < shape.mesh.indices.size(); f += 3) {
         triangles.push_back(Mesh::Triangle(
             shape.mesh.indices[f+0],
@@ -128,8 +137,7 @@ std::vector<Shape const*> makeShapes(std::vector<tinyobj::shape_t> const& shapes
     std::vector<Shape const*> out;
 
     for(size_t i = 0; i < shapes.size(); ++i) {
-        Mesh* m = new Mesh(makeVertexes(shapes[i]), makeTriangles(shapes[i]));
-        m->light = islight;
+        Mesh* m = new Mesh(makeVertexes(shapes[i]), std::vector<V3>(), std::vector<P2>(), makeTriangles(shapes[i]));
         out.push_back(m);
     }
 	
@@ -151,8 +159,8 @@ int object(lua_State* L) {
         exit(1);
     }
 
-    all.push_back(new Transformation( 
-        transforms.top(), new Group( makeShapes(shapes) ) ));
+    //all.push_back(new Transformation( 
+    //    transforms.top(), new Group( makeShapes(shapes) ) ));
     
     return 0;
 }
@@ -170,60 +178,71 @@ int render(lua_State* L) {
     const int64_t samples = (int64_t)lua_tonumber(L, 1);
     std::string filename = lua_tostring(L, 2);
    
-    Shape const* shape = new Group(all);
-    Pinhole c(Point(0,-30,-200,1), 1);
-	const int width = 750, height = 500;
+    Pinhole c(Point(0,0,0,1), 2.414);
+	const int width = 800, height = 425;
 	Sensor s(width,height,2);
-	PointLight light(Point(150,150,-150,1));
+	PointLight light(Point(0,150,0,1));
 
-	for(int64_t i = 0; i < samples; i++) {
-		//Dip p0 = c.sample();
-		//Dip p1 = mesh.sample();
-		//Point p2 = light.sample();
-
-		//Ray ray = {p0.i, (p1.i+-1*p0.i)};
-		//Ray ray2 = {p1.i, (p2+-1*p1.i)};	
-		//float x,y;
-		//c.project(ray, x, y);
-
-		//if(!mesh.hit(ray, 0.999999) && !mesh.hit(ray2, 0.999999)) {
-		//	float g = maxf(p0.p*(~ray.d),0)*maxf((p1.p*(-~ray.d)),0)*1/PI*maxf((p1.p*~ray2.d),0);
-		//	s.detect(x, 1-y, 500, g);
-		//}
-		
+	for(int64_t i = 0; i < samples; i++)
+    {
+        P2 pixel;	
+        P2 pSensor = s.sample(i, samples, pixel);
+	
 		Dip p0, p1, p2;
 		Point d0;
-		c.sampleDir(p0, d0);
-		Ray ray = {p0.i, d0};
-        float t = Infinity;
-		bool hit = shape->min(ray, p1, t);
+		c.sample(pSensor, p0, d0);
         
-        if(hit) {
-            float x,y;
-		    c.project(ray, x, y);
-        	
-		    //Point p2 = light.sample();
-            p2 = shape->r();
-            Ray ray2 = {p1.i, p2.i-p1.i};	
-			// sample circle
-			//float u = gi_random()*2*PI; 
-			//float v = gi_random();
-			//float x = cos(u)*v;
-			//float y = sin(y)*v;
-			//float z = sqrt(1-v);
-			//out = f*Point(0,-1,0,0) + u*Point(1,0,0,0) + v*Point(0,0,1,0);
-            if(/*p2.light &&*/ !shape->any(ray2, 0.9999)) {
-                float g = maxf(((~p1.p)*(~ray2.d)),0)
-                        * maxf(((~p2.p)*-(~ray2.d)),0);
-			    s.detect(x,y, 625, 10000*g);
+		Ray ray = {p0.i, d0};
+        ray = (cameraTransform)*ray;
+
+        rgba l(1,1,1,1);
+        rgba direct(0,0,0,0);
+ 
+        int depth = 0;
+        while(true)
+        {
+            float t = Infinity;
+		    Instance const* hit = scene->min(ray, p1, t);
+
+            if(hit)
+            {
+                // add in direct lighting
+                {
+                    auto dl = scene->sampleL(p1);
+
+                    Ray dltest {p1.i, dl.second};
+                    auto brdf = hit->material->eval(p1.uv);
+                    if(!scene->any(dltest, Infinity)) {
+                        s.detect(pixel,l*dl.first*brdf);
+                    }
+                    //float g = maxf(-((~p1.p)*(~ray.d)),0)
+                    //        * maxf(((~p1.p)*(out)),0);
+                }
+
+                // sample outgoing ray
+                auto event = hit->material->sample(p1, V3(ray.d));
+                l *= event.first; 
+                auto out = event.second;
+ 
+                ray = { p1.i, out };
             }
-		}
-        else {
-            float x,y;
-		    c.project(ray, x, y);
-            s.detect(x,y,500,300);
+            else
+            {
+                l *= scene->L(ray.d);
+                break;
+            }
+
+            depth++;
+
+            if(depth > 5)
+            {
+                l = rgba(0,0,0,0);
+                break;
+            }
         }
-	
+
+        s.detect(pixel,l*3);
+
         if(i%100000==0) {
             lua_pushvalue(L, 3);
             lua_pushnumber(L, (lua_Number)i);
@@ -248,7 +267,6 @@ int render(lua_State* L) {
 	s.outputEXR(filename);
 
     printf("\n");
-    delete shape;
 
     return 0;
 }
@@ -261,6 +279,18 @@ void report_errors(lua_State* L, int status)
     }
 }
 
+int fungiParsePBRT(lua_State* L)
+{
+    int argc = lua_gettop(L);
+    if(argc != 1)
+        std::cerr << "parsePBRT takes 1 arguments" << std::endl;
+
+    std::string file = lua_tostring(L, 1);
+    parsePBRT(file);
+
+    return 0;
+}
+
 int main(int argc, char** argv) {
 
     srand(1);
@@ -270,9 +300,11 @@ int main(int argc, char** argv) {
     for ( int n=1; n<argc; ++n ) {
         const char* file = argv[n];
 
-        lua_State *L = lua_open();
+        lua_State *L = luaL_newstate();
 
         luaL_openlibs(L);
+
+        registerAPI(L);
 
         lua_register(L, "time", time);
         lua_register(L, "scale", scale);
@@ -285,6 +317,7 @@ int main(int argc, char** argv) {
         lua_register(L, "obj", object);
         lua_register(L, "light", light);
         lua_register(L, "render", render);
+        lua_register(L, "parsePBRT", fungiParsePBRT);
 
         std::cerr << "Running: " << file << std::endl;
 
