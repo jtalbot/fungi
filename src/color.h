@@ -1,6 +1,9 @@
 
 #pragma once
 
+#include <cmath>
+#include <string>
+
 struct rgba {
     double r, g, b, a;
 
@@ -14,8 +17,20 @@ struct rgba {
         return rgba(r * o.r, g * o.g, b * o.b, a * o.a);
     }
 
+    rgba operator/(rgba const& o) const {
+        return rgba(r / o.r, g / o.g, b / o.b, a / o.a);
+    }
+
+    rgba operator/(double s) const {
+        return rgba(r / s, g / s, b / s, a / s);
+    }
+
     rgba operator+(rgba const& o) const {
         return rgba(r + o.r, g + o.g, b + o.b, a + o.a);
+    }
+
+    rgba operator-(rgba const& o) const {
+        return rgba(r - o.r, g - o.g, b - o.b, a - o.a);
     }
 
     rgba& operator+=(rgba const& o) {
@@ -33,7 +48,15 @@ struct rgba {
         a *= o.a;
         return *this;
     }
+
+    rgba sqrt() const {
+        return rgba(std::sqrt(r), std::sqrt(g), std::sqrt(b), std::sqrt(a));
+    }
 };
+
+inline rgba operator*(double s, rgba const& o) {
+    return o*s;
+}
 
 //	RGB <--> XYZ matrices
 static const double XYZtoRGB[3][3] = {{+2.5623f, -1.1661f, -0.3962f},
@@ -347,6 +370,8 @@ struct Spectrum {
         return rr;*/
         return rgba(x * weight, y * weight, z * weight, 1);
     }
+
+    static Spectrum loadSPD(std::string const& filename);
 
     static const Spectrum zero;
     static const Spectrum one;

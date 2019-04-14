@@ -236,6 +236,37 @@ std::pair<rgba, V3> GlassMaterial::sample(Dip const& dip, V3 const& in) const {
     }
 }
 
+std::pair<rgba, V3> MetalMaterial::sample(Dip const& dip, V3 const& in) const {
+    auto local = makeLocal(dip);
+
+    auto i = local * in;
+
+    auto eta = this->eta->eval(dip.uv);
+    auto k = this->k->eval(dip.uv);
+
+    auto cosTheta2 = i.z * i.z;
+    auto sinTheta2 = 1.f - cosTheta2;
+    auto eta2 = eta * eta;
+    auto k2 = k * k;
+
+    auto t0 = eta2 - k2 - rgba(1,1,1,1)*sinTheta2;
+    auto a2plusb2 = (t0 * t0 + 4.f*eta2*k2).sqrt();
+    auto t1 = a2plusb2 + rgba(1,1,1,1)*cosTheta2;
+    auto a = (0.5f * (a2plusb2 + t0)).sqrt();
+    auto t2 = 2.f*a*i.z;
+    auto rs = (t1 - t2) / (t1 + t2);
+
+    auto t3 = a2plusb2 * cosTheta2 + rgba(1, 1, 1, 1) * sinTheta2 * sinTheta2;
+    auto t4 = t2 * sinTheta2;
+    auto rp = rs * (t3 - t4) / (t3 + t4);
+
+    auto r = 0.5f * (rp + rs);
+
+    // Should use microfacet model probably.
+    auto out = V3(~makeLocal(dip) * sampleHemisphere(1));
+    return std::make_pair(r, out);
+}
+
 /*std::pair<rgba, V3> GlassMaterial::sample(Dip const& dip, V3 const& in) const
 {
     // If the input vector length is proportional to the

@@ -28,7 +28,7 @@ class ScaleTexture : public Texture {
    public:
     ScaleTexture(std::shared_ptr<Texture const> a,
                  std::shared_ptr<Texture const> b)
-        : a(a), b(b) {}
+        : a(std::move(a)), b(std::move(b)) {}
 
     rgba eval(P2 const& uv) const override final {
         return a->eval(uv) * b->eval(uv);
@@ -43,7 +43,7 @@ class MixTexture : public Texture {
     MixTexture(std::shared_ptr<Texture const> a,
                std::shared_ptr<Texture const> b,
                std::shared_ptr<Texture const> m)
-        : a(a), b(b), m(m) {}
+        : a(std::move(a)), b(std::move(b)), m(std::move(m)) {}
 
     rgba eval(P2 const& uv) const override final {
         auto f = m->eval(uv);
@@ -76,7 +76,7 @@ class MixMaterial : public Material {
     MixMaterial(std::shared_ptr<Texture const> amount,
                 std::shared_ptr<Material const> a,
                 std::shared_ptr<Material const> b)
-        : amount(amount), a(a), b(b) {}
+        : amount(std::move(amount)), a(std::move(a)), b(std::move(b)) {}
 
     rgba eval(P2 const& uv) const override final {
         rgba f = amount->eval(uv);
@@ -98,7 +98,7 @@ class BumpMaterial : public Material {
    public:
     BumpMaterial(std::shared_ptr<Texture const> bumpMap,
                  std::shared_ptr<Material const> m)
-        : bumpMap(bumpMap), m(m) {}
+        : bumpMap(std::move(bumpMap)), m(std::move(m)) {}
 
     rgba eval(P2 const& uv) const override final;
 
@@ -112,7 +112,7 @@ class BumpMaterial : public Material {
 
 class DiffuseMaterial : public Material {
    public:
-    DiffuseMaterial(std::shared_ptr<Texture const> kd) : kd(kd) {}
+    DiffuseMaterial(std::shared_ptr<Texture const> kd) : kd(std::move(kd)) {}
 
     rgba eval(P2 const& uv) const override final { return kd->eval(uv); }
 
@@ -127,7 +127,7 @@ class GlassMaterial : public Material {
    public:
     GlassMaterial(std::shared_ptr<Texture const> Kr,
                   std::shared_ptr<Texture const> Kt)
-        : Kr(Kr), Kt(Kt), eta(1.5) {}
+        : Kr(std::move(Kr)), Kt(std::move(Kt)), eta(1.5) {}
 
     rgba eval(P2 const& uv) const override final { return rgba(0, 0, 0, 0); }
 
@@ -137,4 +137,19 @@ class GlassMaterial : public Material {
    private:
     const std::shared_ptr<Texture const> Kr, Kt;
     const float eta;
+};
+
+class MetalMaterial : public Material {
+   public:
+    MetalMaterial(std::shared_ptr<Texture const> eta,
+                  std::shared_ptr<Texture const> k)
+        : eta(std::move(eta)), k(std::move(k)) {}
+
+    rgba eval(P2 const& uv) const override final { return rgba(0, 0, 0, 0); }
+
+    std::pair<rgba, V3> sample(Dip const& dip,
+                               V3 const& in) const override final;
+
+   private:
+    const std::shared_ptr<Texture const> eta, k;
 };

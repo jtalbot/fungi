@@ -418,6 +418,10 @@ std::shared_ptr<Texture const> makeTexture(std::string const& name,
     } else if (params.hasFloat(std::string("float ") + name)) {
         auto f = params.getFloat(std::string("float " + name));
         return std::make_shared<ConstantTexture const>(rgba(f, f, f, f));
+    } else if (params.hasString(std::string("spectrum ") + name)) {
+        auto spd = params.getString(std::string("spectrum " + name));
+        return std::make_shared<ConstantTexture const>(
+            rgba(Spectrum::loadSPD(pbrtPath + spd)));
     } else if (params.hasString(std::string("texture ") + name)) {
         auto named = params.getString(std::string("texture ") + name);
         auto texture = PBRTState::namedTextures.find(named);
@@ -448,6 +452,11 @@ std::shared_ptr<const Material> makeMaterial(std::string const& type,
         auto Kr = makeTexture("Kr", params, rgba(1, 1, 1, 1));
         auto Kt = makeTexture("Kt", params, rgba(1, 1, 1, 1));
         result = std::make_shared<GlassMaterial>(Kr, Kt);
+    } else if (type == "metal") {
+        printf("Parsing metal\n");
+        auto k = makeTexture("k", params, rgba(1, 1, 1, 1));
+        auto eta = makeTexture("eta", params, rgba(1, 1, 1, 1));
+        result = std::make_shared<MetalMaterial>(eta, k);
     } else {
         result = std::make_shared<DiffuseMaterial>(
             makeTexture("Kd", params, rgba(1, 0, 0, 1)));
