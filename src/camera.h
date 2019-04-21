@@ -12,28 +12,23 @@ struct Pinhole {
 
     Pinhole(Point l, float f) : l(l), f(f) { ip = Plane(0, 0, 1, l.z); }
 
-    Dip sample() const {
-        Dip dip = {l, ip};
+    Dip sample(P2 const& sensor) const {
+        Dip dip = {P3(l), V3(1,0,0), V3(0,1,0),
+                   sensor, P2(1,0), P2(0,1)};
         return dip;
     };
 
-    void sampleDir(Dip& dip, Point& out) const {
-        dip = (Dip){l, ip};
-
-        float u = gi_random() * 2 - 1;
-        float v = gi_random() * 2 - 1;
-        out = f * Point(0, 0, 1, 0) + u * Point(1, 0, 0, 0) +
-              v * Point(0, 1, 0, 0);
-    };
-
-    void sample(P2 const& sensor, Dip& dip, Point& out) const {
-        dip = (Dip){l, ip};
-        out = f * Point(0, 0, 1, 0) + sensor.u * Point(1, 0, 0, 0) +
-              sensor.v * Point(0, 1, 0, 0);
+    void sample(P2 const& sensor, Dip& dip, V3& out) const {
+        dip = sample(sensor);
+        out = V3(sensor.u, sensor.v, f);
     }
 
-    /*void project(Ray const& r, float& x, float&y) const {
-            x = r.d.x/r.d.z * f;
-            y = r.d.y/r.d.z * f;
-    }*/
+    void sampleDir(Dip& dip, V3& out) const {
+        float u = gi_random() * 2 - 1;
+        float v = gi_random() * 2 - 1;
+
+        sample(P2(u,v), dip, out);
+    };
+
 };
+

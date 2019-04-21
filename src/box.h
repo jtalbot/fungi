@@ -4,31 +4,13 @@
 #include <limits>
 #include "la.h"
 
-/*#define Infinity (std::numeric_limits<float>::infinity())
-
-inline float minf(const float a, const float b) {
-        return a < b ? a : b;
-}
-
-inline float maxf(const float a, const float b) {
-        return a > b ? a : b;
-}
-
-inline P3 min(P3 const& p0, P3 const& p1) {
-        return P3(minf(p0.x, p1.x), minf(p0.y, p1.y), minf(p0.z, p1.z));
-}
-
-inline P3 max(P3 const& p0, P3 const& p1) {
-        return P3(maxf(p0.x, p1.x), maxf(p0.y, p1.y), maxf(p0.z, p1.z));
-}*/
-
 struct Box {
     P3 m, n;
 
     Box()
         : m(Infinity, Infinity, Infinity), n(-Infinity, -Infinity, -Infinity) {}
 
-    bool intersect(Point const& o, Point const& id, const float t) const {
+    bool intersect(P3 const& o, V3 const& id, const float t) const {
         float lmin = 0, lmax = t;
 
         const float xa = (m.x - o.x) * id.x;

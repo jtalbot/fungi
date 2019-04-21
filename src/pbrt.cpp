@@ -74,6 +74,16 @@ struct Params {
         else
             return rgba(0, 1, 0, 0);
     }
+    
+    bool hasBool(std::string const& key) const { return bools.count(key) > 0; }
+
+    bool getBool(std::string const& key) const {
+        auto i = bools.find(key);
+        if (i != bools.end() && i->second.size() == 1)
+            return i->second[0];
+        else
+            return false;
+    }
 };
 
 struct Object {
@@ -453,10 +463,15 @@ std::shared_ptr<const Material> makeMaterial(std::string const& type,
         auto Kt = makeTexture("Kt", params, rgba(1, 1, 1, 1));
         result = std::make_shared<GlassMaterial>(Kr, Kt);
     } else if (type == "metal") {
-        printf("Parsing metal\n");
         auto k = makeTexture("k", params, rgba(1, 1, 1, 1));
         auto eta = makeTexture("eta", params, rgba(1, 1, 1, 1));
         result = std::make_shared<MetalMaterial>(eta, k);
+    } else if (type == "plastic") {
+        auto Kd = makeTexture("Kd", params, rgba(0.25, 0.25, 0.25, 0.25));
+        auto Ks = makeTexture("Ks", params, rgba(0.25, 0.25, 0.25, 0.25));
+        auto roughness = makeTexture("roughness", params, rgba(0.1, 0.1, 0.1, 0.1));
+        auto remap = params.getBool("bool remaproughness");
+        result = std::make_shared<PlasticMaterial>(Kd, Ks, roughness, remap);
     } else {
         result = std::make_shared<DiffuseMaterial>(
             makeTexture("Kd", params, rgba(1, 0, 0, 1)));
@@ -643,7 +658,7 @@ Params parseParams(Tokens& tokens) {
             r.strings[param] = parseStrings(tokens);
         else if (param.rfind("integer", 0) == 0)
             r.ints[param] = parseInts(tokens);
-        else if (param.rfind("string", 0) == 0)
+        else if (param.rfind("bool", 0) == 0)
             r.bools[param] = parseBools(tokens);
         else
             r.reals[param] = parseReals(tokens);

@@ -8,15 +8,11 @@
 #include <string>
 
 Transform makeLocal(Dip const& d) {
-    auto z = normalize(d.n);
+    auto x = normalize(d.didu);
+    auto z = cross(x,normalize(d.didv));
+    auto y = cross(z,x);
 
-    V3 x = normalize(d.didu);
-    V3 y = cross(z, x);
-    x = cross(y, z);
-
-    Transform local(y, x, z, Point(0, 0, 0, 1));
-
-    return local;
+    return Transform(x, y, z, Point(0, 0, 0, 1));
 }
 
 class ImageTexture::Impl {
@@ -174,12 +170,12 @@ std::pair<rgba, V3> BumpMaterial::sample(Dip const& dip, V3 const& i) const {
     auto d1 = bumpMap->eval(dip.uv + dip.dtdu * 0.001).g;
     auto d2 = bumpMap->eval(dip.uv + dip.dtdv * 0.001).g;
 
-    V3 du = dip.didu + dip.n * (d1 - d0) * dip.dtdu.length() / 0.01;
-    V3 dv = dip.didv + dip.n * (d2 - d0) * dip.dtdv.length() / 0.01;
+    auto n = normalize(cross(dip.didu, dip.didv));
 
-    auto n = cross(du, dv);
+    V3 du = dip.didu + n * (d1 - d0) * dip.dtdu.length() / 0.01;
+    V3 dv = dip.didv + n * (d2 - d0) * dip.dtdv.length() / 0.01;
 
-    auto newDip = Dip{dip.i, dip.p, n, dip.uv, du, dv, dip.dtdu, dip.dtdv};
+    auto newDip = Dip{dip.i, du, dv, dip.uv, dip.dtdu, dip.dtdv};
 
     return m->sample(newDip, i);
 }
@@ -239,7 +235,7 @@ std::pair<rgba, V3> GlassMaterial::sample(Dip const& dip, V3 const& in) const {
 std::pair<rgba, V3> MetalMaterial::sample(Dip const& dip, V3 const& in) const {
     auto local = makeLocal(dip);
 
-    auto i = local * in;
+    auto i = Point(normalize(V3(local * in)));
 
     auto eta = this->eta->eval(dip.uv);
     auto k = this->k->eval(dip.uv);
@@ -249,11 +245,11 @@ std::pair<rgba, V3> MetalMaterial::sample(Dip const& dip, V3 const& in) const {
     auto eta2 = eta * eta;
     auto k2 = k * k;
 
-    auto t0 = eta2 - k2 - rgba(1,1,1,1)*sinTheta2;
-    auto a2plusb2 = (t0 * t0 + 4.f*eta2*k2).sqrt();
-    auto t1 = a2plusb2 + rgba(1,1,1,1)*cosTheta2;
+    auto t0 = eta2 - k2 - rgba(1, 1, 1, 1) * sinTheta2;
+    auto a2plusb2 = (t0 * t0 + 4.f * eta2 * k2).sqrt();
+    auto t1 = a2plusb2 + rgba(1, 1, 1, 1) * cosTheta2;
     auto a = (0.5f * (a2plusb2 + t0)).sqrt();
-    auto t2 = 2.f*a*i.z;
+    auto t2 = 2.f * a * i.z;
     auto rs = (t1 - t2) / (t1 + t2);
 
     auto t3 = a2plusb2 * cosTheta2 + rgba(1, 1, 1, 1) * sinTheta2 * sinTheta2;
@@ -263,7 +259,7 @@ std::pair<rgba, V3> MetalMaterial::sample(Dip const& dip, V3 const& in) const {
     auto r = 0.5f * (rp + rs);
 
     // Should use microfacet model probably.
-    auto out = V3(~makeLocal(dip) * sampleHemisphere(1));
+    auto out = V3(~local * sampleHemisphere(1));
     return std::make_pair(r, out);
 }
 
@@ -315,3 +311,14 @@ std::pair<rgba, V3> MetalMaterial::sample(Dip const& dip, V3 const& in) const {
     // Total internal reflection or Fresnel reflectance
     return std::make_pair(Kr->eval(dip.uv), r);
 }*/
+
+rgba PlasticMaterial::eval(P2 const& uv) const {
+    return Kd->eval(uv);
+}
+
+std::pair<rgba, V3> PlasticMaterial::sample(Dip const& dip,
+                                            V3 const& in) const {
+    auto out = V3(~makeLocal(dip) * sampleHemisphere(1));
+    return std::make_pair(eval(dip.uv), out);
+}
+

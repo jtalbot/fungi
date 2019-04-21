@@ -153,3 +153,21 @@ class MetalMaterial : public Material {
    private:
     const std::shared_ptr<Texture const> eta, k;
 };
+
+class PlasticMaterial : public Material {
+   public:
+    PlasticMaterial(std::shared_ptr<Texture const> Kd,
+                  std::shared_ptr<Texture const> Ks,
+                  std::shared_ptr<Texture const> roughness,
+                  bool remap)
+        : Kd(std::move(Kd)), Ks(std::move(Ks)), roughness(std::move(roughness)), remap(remap) {}
+
+    rgba eval(P2 const& uv) const override final;
+
+    std::pair<rgba, V3> sample(Dip const& dip,
+                               V3 const& in) const override final;
+
+   private:
+    const std::shared_ptr<Texture const> Kd, Ks, roughness;
+    bool remap;
+};

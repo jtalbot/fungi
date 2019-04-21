@@ -33,27 +33,30 @@ class Mesh : public Shape {
 
         Triangle(int a, int b, int c) : a(a), b(b), c(c) {}
 
-        Point intersect(Mesh const& m, Ray const& r) const {
+        V3 intersect(Mesh const& m, Ray const& r) const {
             auto x = Transform{Point(m.v[b]) - m.v[a], Point(m.v[c]) - m.v[a],
                                -r.d, Point(0, 0, 0, 1)};
 
-            return x * (r.o - m.v[a]);
+            return V3(x * (r.o - m.v[a]));
         }
 
-        static bool isInside(Point const& i, float const t) {
+        static bool isInside(V3 const& i, float const t) {
             return i.x >= 0 && i.y >= 0 && i.x + i.y < 1 && i.z > 0.00001f &&
                    i.z < t;
         }
 
-        Dip sample(Mesh const& m, Point const& i) const {
-            Plane p = m.v[a] * m.v[b] * m.v[c];
+        Dip sample(Mesh const& m, Point const& t) const {
+            auto i = interpolate(m.v[a], m.v[b], m.v[c], t.x, t.y);
 
-            V3 n = m.n.size() > 0
-                       ? interpolate(m.n[a], m.n[b], m.n[c], i.x, i.y)
-                       : V3(p.a, p.b, p.c);
+            auto didu = V3(m.v[b].x - m.v[a].x, m.v[b].y - m.v[a].y,
+                           m.v[b].z - m.v[a].z);
+            auto didv = V3(m.v[c].x - m.v[a].x, m.v[c].y - m.v[a].y,
+                           m.v[c].z - m.v[a].z);
+
+
             P2 uv = m.uv.size() > 0
-                        ? interpolate(m.uv[a], m.uv[b], m.uv[c], i.x, i.y)
-                        : P2(i.x, i.y);
+                        ? interpolate(m.uv[a], m.uv[b], m.uv[c], t.x, t.y)
+                        : P2(t.x, t.y);
 
             auto dtdu = m.uv.size() > 0
                             ? P2(m.uv[b].u - m.uv[a].u, m.uv[b].v - m.uv[a].v)
@@ -63,19 +66,8 @@ class Mesh : public Shape {
                             ? P2(m.uv[c].u - m.uv[a].u, m.uv[c].v - m.uv[a].v)
                             : P2(0, 1);
 
-            auto didu = V3(m.v[b].x - m.v[a].x, m.v[b].y - m.v[a].y,
-                           m.v[b].z - m.v[a].z);
-            auto didv = V3(m.v[c].x - m.v[a].x, m.v[c].y - m.v[a].y,
-                           m.v[c].z - m.v[a].z);
-
-            return Dip{interpolate(m.v[a], m.v[b], m.v[c], i.x, i.y),
-                       p,
-                       n,
-                       uv,
-                       didu,
-                       didv,
-                       dtdu,
-                       dtdv};
+            return Dip{i, didu, didv,
+                       uv, dtdu, dtdv};
         }
 
         Dip r(Mesh const& m) const {
@@ -120,77 +112,72 @@ class Mesh : public Shape {
     //	printf("bb/ray:  %f\n", (float)bbtests/rays);
     //}
 
-    bool min(Ray const& r, Dip& dip, float& t) const {
+    bool min(Ray const& r, Dip& dip, float& t) const override final {
         rays++;
-        Point id(1.f / r.d.x, 1.f / r.d.y, 1.f / r.d.z, 0);
-        if (bvh.root().intersect(r.o, id, t)) {
-            return minBVH(bvh.n[0], r, id, dip, t);
-        }
-        return false;
+        return min(bvh.n[0], r, 1.f/r.d, dip, t);
     }
 
-    bool any(Ray const& r, float t) const {
+    bool any(Ray const& r, float t) const override final {
         rays++;
-        Point id(1.f / r.d.x, 1.f / r.d.y, 1.f / r.d.z, 0);
-        if (bvh.root().intersect(r.o, id, t)) {
-            return anyBVH(bvh.n[0], r, id, t);
-        }
-        return false;
+        return any(bvh.n[0], r, 1.f/r.d, t);
     }
 
-    Dip r() const {
+    Dip r() const override final {
         float s = gi_random() * ecdf.back();
         size_t i = std::upper_bound(ecdf.begin(), ecdf.end(), s) - ecdf.begin();
         Dip dip = m[i].r(*this);
-        dip.p = dip.p *
-                (ecdf.back() / ((i == 0) ? ecdf[0] : (ecdf[i] - ecdf[i - 1])));
+        //dip.p = dip.p *
+        //        (ecdf.back() / ((i == 0) ? ecdf[0] : (ecdf[i] - ecdf[i - 1])));
         return dip;
     }
 
-    float w() const { return ecdf.back(); }
+    float w() const override final { return ecdf.back(); }
 
-    Box bb() const { return bvh.root(); }
+    Box bb() const override final { return bvh.root(); }
 
-   private:
-    bool minBVH(BVH::Node const& node, Ray const& r, Point const& id, Dip& dip,
-                float& t) const {
+private:
+    bool min(BVH::Node const& node, Ray const& r, V3 const& id, Dip& dip, float& t) const {
+        bbtests += 1;
+        if(!node.box.intersect(r.o, id, t))
+            return false;
+
         if (node.end > 0) {
-            bool any = false;
+            bool hit = false;
             for (int i = node.begin; i < node.end; i++) {
-                tritests++;
                 auto intersection = m[bvh.o[i]].intersect(*this, r);
                 if (Triangle::isInside(intersection, t)) {
                     t = intersection.z;
                     dip = m[bvh.o[i]].sample(*this, intersection);
-                    any = true;
+                    hit = true;
                 }
             }
-            return any;
+            tritests += node.end-node.begin;
+            return hit;
         } else {
-            bbtests += 2;
-            bool left = (bvh.n[node.begin].box.intersect(r.o, id, t) &&
-                         minBVH(bvh.n[node.begin], r, id, dip, t));
-            bool right = (bvh.n[node.begin + 1].box.intersect(r.o, id, t) &&
-                          minBVH(bvh.n[node.begin + 1], r, id, dip, t));
+            auto left = min(bvh.n[node.begin], r, id, dip, t);
+            auto right = min(bvh.n[node.begin + 1], r, id, dip, t);
             return left || right;
         }
     }
 
-    bool anyBVH(BVH::Node const& node, Ray const& r, Point const& id,
-                float t) const {
+    bool any(BVH::Node const& node, Ray const& r, V3 const& id, float t) const {
+        bbtests += 1;
+        if(!node.box.intersect(r.o, id, t))
+            return false;
+
         if (node.end > 0) {
             for (int i = node.begin; i < node.end; i++) {
-                tritests++;
-                if (Triangle::isInside(m[bvh.o[i]].intersect(*this, r), t))
+                auto intersection = m[bvh.o[i]].intersect(*this, r);
+                if (Triangle::isInside(intersection, t)) {
+                    tritests += (i+1)-node.begin;
                     return true;
+                }
             }
+            tritests += node.end-node.begin;
             return false;
         } else {
-            bbtests += 2;
-            return (bvh.n[node.begin].box.intersect(r.o, id, t) &&
-                    anyBVH(bvh.n[node.begin], r, id, t)) ||
-                   (bvh.n[node.begin + 1].box.intersect(r.o, id, t) &&
-                    anyBVH(bvh.n[node.begin + 1], r, id, t));
+            return any(bvh.n[node.begin], r, id, t) ||
+                   any(bvh.n[node.begin + 1], r, id, t);
         }
     }
 
@@ -206,6 +193,87 @@ class Mesh : public Shape {
     mutable int64_t tritests;
     mutable int64_t bbtests;
 };
+
+/*class Sphere : public Shape {
+public:
+    Sphere(float radius)
+        : radius(radius) {}
+
+    bool min(Ray const& r, Dip& dip, float& t) const override final {
+        auto v = P3(0,0,0)-P3(r.o);
+        // project
+        auto s = dot(v,V3(r.d));
+        // d is the vector from the origin to the nearest point on the ray
+        auto d = v-V3(r.d)*s;
+        // the distance from the origin to the ray
+        auto d2 = dot(d,d);
+
+        // is the distance from the origin to the ray less than the radius?
+        if(d2 > radius*radius) {
+            return false;
+        }
+
+        // chord is the distance from the
+        auto chord = sqrt(radius*radius - d2);
+        // I think add/sub the chord and s is assuming a normalized ray.
+        auto t1 = s-chord;
+        auto t2 = s+chord;
+
+        if(t1 > 0 && t1 < t) {
+            auto hit = r.o+r.d*t1;
+            auto normal = ;
+            frame = ;
+            t = t1;
+            return true;
+        }
+        else if(t2 > 0 && t2 < t) {
+            auto hit = r.o+r.d*t2;
+            auto normal = ;
+            frame = ;
+            t = t2;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool any(Ray const& r, float t) const override final {
+        auto v = P3(0,0,0)-P3(r.o);
+        auto s = v * V3(r.d);
+        auto d = v-V3(r.d)*s;
+        auto d2 = d*d;
+
+        if(d2 > radius*radius) {
+            return false;
+        }
+
+        auto chord = sqrt(radius*radius - d2);
+        auto t1 = s-chord;
+        auto t2 = s+chord;
+
+        if(t1 > 0 && t1 < t) {
+            return true;
+        }
+        else if(t2 > 0 && t2 < t) {
+            return true;
+        }
+
+        return false;
+    }
+
+    Dip r() const override final {
+    }
+
+    float w() const override final {
+    }
+
+    Box bb() const override final {
+
+    }
+
+private:
+    float radius;
+};*/
 
 /*class Transformation : public Shape {
 public:

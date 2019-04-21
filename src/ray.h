@@ -7,23 +7,22 @@
 #include "la.h"
 
 struct Ray {
-    Point o, d;
-} __attribute__((aligned));
+    P3 o;
+    V3 d;
+};
 
 inline Ray operator*(Transform const& t, Ray const& r) {
-    return (Ray){t * r.o, t * r.d};
+    return {P3(t * r.o), V3(t * r.d)};
 }
 
 struct Dip {
-    Point i;
-    Plane p;
-    V3 n;
-    P2 uv;
+    P3 i;
     V3 didu, didv;
+    P2 uv;
     P2 dtdu, dtdv;
 };
 
 inline Dip operator*(Transform const& t, Dip const& d) {
-    return (Dip){t * d.i,        d.p * t,        d.n,    d.uv,
-                 V3(t * d.didu), V3(t * d.didv), d.dtdu, d.dtdv};
+    return {P3(t * d.i), V3(t * d.didu), V3(t * d.didv),
+                d.uv, d.dtdu, d.dtdv};
 }

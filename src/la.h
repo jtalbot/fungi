@@ -8,9 +8,9 @@
 
 #define Infinity (std::numeric_limits<float>::infinity())
 
-inline float minf(const float a, const float b) { return a < b ? a : b; }
+constexpr float minf(const float a, const float b) { return a < b ? a : b; }
 
-inline float maxf(const float a, const float b) { return a > b ? a : b; }
+constexpr float maxf(const float a, const float b) { return a > b ? a : b; }
 
 struct Scalar;
 struct Point;
@@ -26,7 +26,7 @@ struct Scalar {
     float s;
 
     Scalar() {}
-    Scalar(float s) : s(s) {}
+    constexpr Scalar(float s) : s(s) {}
     explicit operator float() const { return s; }
 
     Scalar operator+(Scalar o) const { return s + o.s; }
@@ -40,18 +40,18 @@ struct Scalar {
     Scalar operator-() const { return -s; }
 };
 
-inline Scalar operator*(float f, Scalar s) { return f * s.s; }
-inline Scalar operator*(Scalar s, float f) { return s.s * f; }
-inline Scalar operator/(float f, Scalar s) { return f / s.s; }
-inline Scalar operator/(Scalar s, float f) { return s.s / f; }
-inline Scalar minf(Scalar s, Scalar t) { return minf(s.s, t.s); }
-inline Scalar maxf(Scalar s, Scalar t) { return maxf(s.s, t.s); }
+constexpr Scalar operator*(float f, Scalar s) { return f * s.s; }
+constexpr Scalar operator*(Scalar s, float f) { return s.s * f; }
+constexpr Scalar operator/(float f, Scalar s) { return f / s.s; }
+constexpr Scalar operator/(Scalar s, float f) { return s.s / f; }
+constexpr Scalar minf(Scalar s, Scalar t) { return minf(s.s, t.s); }
+constexpr Scalar maxf(Scalar s, Scalar t) { return maxf(s.s, t.s); }
 
 struct Pseudo {
     float s;
 
     Pseudo() {}
-    explicit Pseudo(float s) : s(s) {}
+    constexpr explicit Pseudo(float s) : s(s) {}
     explicit operator float() const { return s; }
 
     Pseudo operator+(Pseudo o) const { return Pseudo(s + o.s); }
@@ -65,25 +65,25 @@ struct Pseudo {
     Pseudo operator-() const { return Pseudo(-s); }
 };
 
-inline Pseudo operator*(float f, Pseudo p) { return Pseudo(f * p.s); }
-inline Pseudo operator*(Pseudo p, float f) { return Pseudo(p.s * f); }
-inline Pseudo operator/(float f, Pseudo p) { return Pseudo(f / p.s); }
-inline Pseudo operator/(Pseudo p, float f) { return Pseudo(p.s / f); }
-inline Pseudo minf(Pseudo s, Pseudo t) { return Pseudo(minf(s.s, t.s)); }
-inline Pseudo maxf(Pseudo s, Pseudo t) { return Pseudo(maxf(s.s, t.s)); }
+constexpr Pseudo operator*(float f, Pseudo p) { return Pseudo(f * p.s); }
+constexpr Pseudo operator*(Pseudo p, float f) { return Pseudo(p.s * f); }
+constexpr Pseudo operator/(float f, Pseudo p) { return Pseudo(f / p.s); }
+constexpr Pseudo operator/(Pseudo p, float f) { return Pseudo(p.s / f); }
+constexpr Pseudo minf(Pseudo s, Pseudo t) { return Pseudo(minf(s.s, t.s)); }
+constexpr Pseudo maxf(Pseudo s, Pseudo t) { return Pseudo(maxf(s.s, t.s)); }
 
-inline Pseudo operator*(Pseudo p, Scalar s) { return Pseudo(p.s * s.s); }
-inline Pseudo operator*(Scalar s, Pseudo p) { return Pseudo(s.s * p.s); }
+constexpr Pseudo operator*(Pseudo p, Scalar s) { return Pseudo(p.s * s.s); }
+constexpr Pseudo operator*(Scalar s, Pseudo p) { return Pseudo(s.s * p.s); }
 
-inline Pseudo operator/(Pseudo p, Scalar s) { return Pseudo(p.s / s.s); }
-inline Pseudo operator/(Scalar s, Pseudo p) { return Pseudo(s.s / p.s); }
+constexpr Pseudo operator/(Pseudo p, Scalar s) { return Pseudo(p.s / s.s); }
+constexpr Pseudo operator/(Scalar s, Pseudo p) { return Pseudo(s.s / p.s); }
 
 struct Point {
     // e0, e1, e2, e3
     float x, y, z, w;
 
     Point() {}
-    Point(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+    constexpr Point(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 
     Point operator+(Point const& o) const {
         return Point(x + o.x, y + o.y, z + o.z, w + o.w);
@@ -105,7 +105,7 @@ struct Plane {
     float a, b, c, d;
 
     Plane() {}
-    Plane(float a, float b, float c, float d) : a(a), b(b), c(c), d(d) {}
+    constexpr Plane(float a, float b, float c, float d) : a(a), b(b), c(c), d(d) {}
 
     Plane operator+(Plane const& o) const {
         return Plane(a + o.a, b + o.b, c + o.c, d + o.d);
@@ -124,47 +124,47 @@ struct Plane {
     void print() const { printf("c(%f, %f, %f, %f)", a, b, c, d); }
 } __attribute__((aligned));
 
-/*inline Plane Point::operator~() const {
+/*constexpr Plane Point::operator~() const {
     return Plane(1.f/x, 1.f/y, 1.f/z, 1.f/w);
 }
 
-inline Point Plane::operator~() const {
+constexpr Point Plane::operator~() const {
     return Point(1.f/a, 1.f/b, 1.f/c, 1.f/d);
 }*/
 
-inline Point operator*(Point const& p, Scalar s) {
+constexpr Point operator*(Point const& p, Scalar s) {
     return Point(p.x * s.s, p.y * s.s, p.z * s.s, p.w * s.s);
 }
 
-inline Point operator*(Scalar s, Point const& p) { return p * s; }
+constexpr Point operator*(Scalar s, Point const& p) { return p * s; }
 
-inline Plane operator*(Plane const& p, Scalar s) {
+constexpr Plane operator*(Plane const& p, Scalar s) {
     return Plane(p.a * s.s, p.b * s.s, p.c * s.s, p.d * s.s);
 }
 
-inline Plane operator*(Scalar s, Plane const& p) { return p * s; }
+constexpr Plane operator*(Scalar s, Plane const& p) { return p * s; }
 
-inline Point operator*(Plane const& p, Pseudo q) {
+constexpr Point operator*(Plane const& p, Pseudo q) {
     return Point(p.a * q.s, p.b * q.s, p.c * q.s, p.d * q.s);
 }
 
-inline Point operator*(Pseudo q, Plane const& p) {
+constexpr Point operator*(Pseudo q, Plane const& p) {
     return Point(q.s * p.a, q.s * p.b, q.s * p.c, q.s * p.d);
 }
 
-inline Plane operator*(Point const& p, Pseudo q) {
+constexpr Plane operator*(Point const& p, Pseudo q) {
     return Plane(p.x * q.s, p.y * q.s, p.z * q.s, p.w * q.s);
 }
 
-inline Plane operator*(Pseudo q, Point const& p) {
+constexpr Plane operator*(Pseudo q, Point const& p) {
     return Plane(q.s * p.x, q.s * p.y, q.s * p.z, q.s * p.w);
 }
 
-inline Pseudo operator*(Plane const& p, Point const& v) {
+constexpr Pseudo operator*(Plane const& p, Point const& v) {
     return Pseudo(p.a * v.x + p.b * v.y + p.c * v.z + p.d * v.w);
 }
 
-inline Pseudo operator*(Point const& v, Plane const& p) {
+constexpr Pseudo operator*(Point const& v, Plane const& p) {
     return Pseudo(p.a * v.x + p.b * v.y + p.c * v.z + p.d * v.w);
 }
 
@@ -185,38 +185,38 @@ struct Line {
     // e02, e12, e01
     float i, j, k;  // The vector part of plucker coordinates
     float l, m, n;  // The plane part of plucker coordinates
-    Line(float i, float j, float k, float l, float m, float n)
+    constexpr Line(float i, float j, float k, float l, float m, float n)
         : i(i), j(j), k(k), l(l), m(m), n(n) {}
 };
 
-inline Line operator*(Line const& l, Scalar s) {
+constexpr Line operator*(Line const& l, Scalar s) {
     return Line(l.i * s.s, l.j * s.s, l.k * s.s, l.l * s.s, l.m * s.s,
                 l.n * s.s);
 }
 
-inline Line operator*(Scalar s, Line const& l) { return l * s; }
+constexpr Line operator*(Scalar s, Line const& l) { return l * s; }
 
-inline Line operator*(Point const& j, Point const& k) {
+constexpr Line operator*(Point const& j, Point const& k) {
     return Line(j.z * k.w - j.w * k.z, j.w * k.y - j.y * k.w,
                 j.w * k.x - j.x * k.w, j.x * k.z - j.z * k.x,
                 j.y * k.z - j.z * k.y, j.x * k.y - j.y * k.x);
 }
 
-inline Plane operator*(Line const& b, Point const& a) {
+constexpr Plane operator*(Line const& b, Point const& a) {
     return Plane(
         a.y * b.i + a.z * b.j + a.w * b.m, -a.z * b.k - a.w * b.l - a.x * b.i,
         a.w * b.n - a.x * b.j + a.y * b.k, -a.x * b.m + a.y * b.l - a.z * b.n);
 }
 
-inline Plane operator*(Point const& a, Line const& b) { return b * a; }
+constexpr Plane operator*(Point const& a, Line const& b) { return b * a; }
 
-inline Point operator*(Line const& b, Plane const& a) {
+constexpr Point operator*(Line const& b, Plane const& a) {
     return Point(
         a.b * b.i + a.c * b.j + a.d * b.m, -a.c * b.k - a.d * b.l - a.a * b.i,
         a.d * b.n - a.a * b.j + a.b * b.k, -a.a * b.m + a.b * b.l - a.c * b.n);
 }
 
-inline Point operator*(Plane const& a, Line const& b) { return b * a; }
+constexpr Point operator*(Plane const& a, Line const& b) { return b * a; }
 
 // Transforms
 struct Transform {
@@ -227,7 +227,7 @@ struct Transform {
 
     Transform() {}
 
-    Transform(Point const& i0, Point const& i1, Point const& i2,
+    constexpr Transform(Point const& i0, Point const& i1, Point const& i2,
               Point const& i3)
         : det(i1 * i2 * i3 * i0),
           idet(1.f / det.s)
@@ -322,13 +322,13 @@ struct Transform {
 } __attribute__((aligned));
 
 // matrix * point
-inline Point operator*(Transform const& t, Point const& o) {
+constexpr Point operator*(Transform const& t, Point const& o) {
     return Point(float(t.m0 * o), float(t.m1 * o), float(t.m2 * o),
                  float(t.m3 * o));
 }
 
 // plane * matrix
-inline Plane operator*(Plane const& p, Transform const& t) {
+constexpr Plane operator*(Plane const& p, Transform const& t) {
     return Plane(float(p * t.i0), float(p * t.i1), float(p * t.i2),
                  float(p * t.i3));
 }
@@ -354,7 +354,7 @@ inline Transform operator*(Transform const& m, Transform const& n) {
 struct P2 {
     float u, v;
     P2() {}
-    P2(float u, float v) : u(u), v(v) {}
+    constexpr P2(float u, float v) : u(u), v(v) {}
 
     P2 operator-() const { return P2(-u, -v); }
 
@@ -369,7 +369,7 @@ struct P2 {
     Scalar length() const { return std::sqrt(float(u * u + v * v)); }
 };
 
-inline P2 interpolate(P2 const& a, P2 const& b, P2 const& c, float u, float v) {
+constexpr P2 interpolate(P2 const& a, P2 const& b, P2 const& c, float u, float v) {
     return P2(a.u * (1 - u - v) + b.u * u + c.u * v,
               a.v * (1 - u - v) + b.v * u + c.v * v);
 }
@@ -378,22 +378,22 @@ struct P3 {
     float x, y, z;
 
     P3() {}
-    P3(float x, float y, float z) : x(x), y(y), z(z) {}
+    constexpr P3(float x, float y, float z) : x(x), y(y), z(z) {}
     explicit P3(Point const& p);
     operator Point() const;
 };
 
-inline P3 interpolate(P3 const& a, P3 const& b, P3 const& c, float u, float v) {
+constexpr P3 interpolate(P3 const& a, P3 const& b, P3 const& c, float u, float v) {
     return P3(a.x * (1 - u - v) + b.x * u + c.x * v,
               a.y * (1 - u - v) + b.y * u + c.y * v,
               a.z * (1 - u - v) + b.z * u + c.z * v);
 }
 
-inline P3 min(P3 const& p0, P3 const& p1) {
+constexpr P3 min(P3 const& p0, P3 const& p1) {
     return P3(minf(p0.x, p1.x), minf(p0.y, p1.y), minf(p0.z, p1.z));
 }
 
-inline P3 max(P3 const& p0, P3 const& p1) {
+constexpr P3 max(P3 const& p0, P3 const& p1) {
     return P3(maxf(p0.x, p1.x), maxf(p0.y, p1.y), maxf(p0.z, p1.z));
 }
 
@@ -401,7 +401,7 @@ struct V3 {
     float x, y, z;
 
     V3() {}
-    V3(float x, float y, float z) : x(x), y(y), z(z) {}
+    constexpr V3(float x, float y, float z) : x(x), y(y), z(z) {}
     explicit V3(Point const& p);
     operator Point() const;
 
@@ -416,34 +416,40 @@ struct V3 {
     V3 operator/(Scalar f) const { return V3(x / f.s, y / f.s, z / f.s); }
 };
 
-inline V3 interpolate(V3 const& a, V3 const& b, V3 const& c, float u, float v) {
+constexpr V3 operator/(float f, V3 const& v) { return V3(f/v.x, f/v.y, f/v.z); }
+
+constexpr V3 interpolate(V3 const& a, V3 const& b, V3 const& c, float u, float v) {
     return V3(a.x * (1 - u - v) + b.x * u + c.x * v,
               a.y * (1 - u - v) + b.y * u + c.y * v,
               a.z * (1 - u - v) + b.z * u + c.z * v);
 }
 
 inline V3 normalize(V3 const& a) {
-    auto w = sqrt(float(a.x * a.x + a.y * a.y + a.z * a.z));
+    auto w = std::sqrt(float(a.x * a.x + a.y * a.y + a.z * a.z));
     return V3(a.x / w, a.y / w, a.z / w);
 }
 
-inline V3 cross(V3 const& a, V3 const& b) {
+constexpr V3 cross(V3 const& a, V3 const& b) {
     return V3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
               a.x * b.y - a.y * b.x);
 }
 
-inline V3 operator-(P3 const& a, P3 const& b) {
+constexpr float dot(V3 const& a, V3 const& b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+constexpr V3 operator-(P3 const& a, P3 const& b) {
     return V3(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
 inline P3::P3(Point const& p) : x(p.x / p.w), y(p.y / p.w), z(p.z / p.w) {
-    if (p.w == 0) throw "Can't convert Point with w = 0 to a P3";
+    //if (p.w == 0) throw "Can't convert Point with w = 0 to a P3";
 }
 
 inline P3::operator Point() const { return Point(x, y, z, 1.f); }
 
 inline V3::V3(Point const& p) : x(p.x), y(p.y), z(p.z) {
-    if (p.w != 0) throw "Can't convert Point with w != 0 to a V3";
+    //if (p.w != 0) throw "Can't convert Point with w != 0 to a V3";
 }
 
 inline V3::operator Point() const { return Point(x, y, z, 0.f); }

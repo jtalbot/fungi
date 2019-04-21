@@ -181,7 +181,7 @@ int render(lua_State* L) {
         P2 pSensor = s.sample(i, samples, pixel);
 
         Dip p0, p1, p2;
-        Point d0;
+        V3 d0;
         c.sample(pSensor, p0, d0);
 
         Ray ray = {p0.i, d0};
@@ -200,7 +200,7 @@ int render(lua_State* L) {
                 {
                     auto dl = scene->sampleL(p1);
 
-                    Ray dltest{p1.i, dl.second};
+                    Ray dltest{p1.i, V3(dl.second)};
                     auto brdf = hit->material->eval(p1.uv);
                     if (!scene->any(dltest, Infinity)) {
                         s.detect(pixel, l * dl.first * brdf);
