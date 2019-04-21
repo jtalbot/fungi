@@ -177,15 +177,14 @@ int render(lua_State* L) {
     PointLight light(Point(0, 150, 0, 1));
 
     for (int64_t i = 0; i < samples; i++) {
-        P2 pixel;
-        P2 pSensor = s.sample(i, samples, pixel);
+        int pixelx, pixely;
+        P2 pSensor = s.sample(i, samples, pixelx, pixely);
 
         Dip p0, p1, p2;
         V3 d0;
         c.sample(pSensor, p0, d0);
 
-        Ray ray = {p0.i, d0};
-        ray = (cameraTransform)*ray;
+        auto ray = cameraTransform*Ray{p0.i, d0};
 
         rgba l(1, 1, 1, 1);
         rgba direct(0, 0, 0, 0);
@@ -203,7 +202,7 @@ int render(lua_State* L) {
                     Ray dltest{p1.i, V3(dl.second)};
                     auto brdf = hit->material->eval(p1.uv);
                     if (!scene->any(dltest, Infinity)) {
-                        s.detect(pixel, l * dl.first * brdf);
+                        s.detect(pixelx, pixely, l * dl.first * brdf);
                     }
                     // float g = maxf(-((~p1.p)*(~ray.d)),0)
                     //        * maxf(((~p1.p)*(out)),0);
@@ -228,7 +227,7 @@ int render(lua_State* L) {
             }
         }
 
-        s.detect(pixel, l * 3);
+        s.detect(pixelx, pixely, l * 3);
 
         if (i % 100000 == 0) {
             lua_pushvalue(L, 3);

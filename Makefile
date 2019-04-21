@@ -12,7 +12,7 @@ ifeq ($(UNAME),Linux)
 	LIBS += -lrt
 endif
 
-SRC := fungi.cpp api.cpp pbrt.cpp sensor.cpp material.cpp light.cpp color.cpp shape.cpp
+SRC := fungi.cpp api.cpp pbrt.cpp sensor.cpp material.cpp light.cpp color.cpp shape.cpp box.cpp
 TEST_SRC := fungi_tests.cpp la_tests.cpp
 
 EXECUTABLE := fungi

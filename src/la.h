@@ -83,7 +83,8 @@ struct Point {
     float x, y, z, w;
 
     Point() {}
-    constexpr Point(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+    constexpr Point(float x, float y, float z, float w)
+        : x(x), y(y), z(z), w(w) {}
 
     Point operator+(Point const& o) const {
         return Point(x + o.x, y + o.y, z + o.z, w + o.w);
@@ -105,7 +106,8 @@ struct Plane {
     float a, b, c, d;
 
     Plane() {}
-    constexpr Plane(float a, float b, float c, float d) : a(a), b(b), c(c), d(d) {}
+    constexpr Plane(float a, float b, float c, float d)
+        : a(a), b(b), c(c), d(d) {}
 
     Plane operator+(Plane const& o) const {
         return Plane(a + o.a, b + o.b, c + o.c, d + o.d);
@@ -228,7 +230,7 @@ struct Transform {
     Transform() {}
 
     constexpr Transform(Point const& i0, Point const& i1, Point const& i2,
-              Point const& i3)
+                        Point const& i3)
         : det(i1 * i2 * i3 * i0),
           idet(1.f / det.s)
           // this is the matrix inverse, faster to negate the determinant than
@@ -369,7 +371,8 @@ struct P2 {
     Scalar length() const { return std::sqrt(float(u * u + v * v)); }
 };
 
-constexpr P2 interpolate(P2 const& a, P2 const& b, P2 const& c, float u, float v) {
+constexpr P2 interpolate(P2 const& a, P2 const& b, P2 const& c, float u,
+                         float v) {
     return P2(a.u * (1 - u - v) + b.u * u + c.u * v,
               a.v * (1 - u - v) + b.v * u + c.v * v);
 }
@@ -383,7 +386,8 @@ struct P3 {
     operator Point() const;
 };
 
-constexpr P3 interpolate(P3 const& a, P3 const& b, P3 const& c, float u, float v) {
+constexpr P3 interpolate(P3 const& a, P3 const& b, P3 const& c, float u,
+                         float v) {
     return P3(a.x * (1 - u - v) + b.x * u + c.x * v,
               a.y * (1 - u - v) + b.y * u + c.y * v,
               a.z * (1 - u - v) + b.z * u + c.z * v);
@@ -416,9 +420,16 @@ struct V3 {
     V3 operator/(Scalar f) const { return V3(x / f.s, y / f.s, z / f.s); }
 };
 
-constexpr V3 operator/(float f, V3 const& v) { return V3(f/v.x, f/v.y, f/v.z); }
+constexpr V3 operator/(float f, V3 const& v) {
+    return V3(f / v.x, f / v.y, f / v.z);
+}
 
-constexpr V3 interpolate(V3 const& a, V3 const& b, V3 const& c, float u, float v) {
+constexpr V3 operator*(V3 const& a, V3 const& b) {
+    return V3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+
+constexpr V3 interpolate(V3 const& a, V3 const& b, V3 const& c, float u,
+                         float v) {
     return V3(a.x * (1 - u - v) + b.x * u + c.x * v,
               a.y * (1 - u - v) + b.y * u + c.y * v,
               a.z * (1 - u - v) + b.z * u + c.z * v);
@@ -435,7 +446,7 @@ constexpr V3 cross(V3 const& a, V3 const& b) {
 }
 
 constexpr float dot(V3 const& a, V3 const& b) {
-    return a.x*b.x + a.y*b.y + a.z*b.z;
+    return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 constexpr V3 operator-(P3 const& a, P3 const& b) {
@@ -443,13 +454,13 @@ constexpr V3 operator-(P3 const& a, P3 const& b) {
 }
 
 inline P3::P3(Point const& p) : x(p.x / p.w), y(p.y / p.w), z(p.z / p.w) {
-    //if (p.w == 0) throw "Can't convert Point with w = 0 to a P3";
+    // if (p.w == 0) throw "Can't convert Point with w = 0 to a P3";
 }
 
 inline P3::operator Point() const { return Point(x, y, z, 1.f); }
 
 inline V3::V3(Point const& p) : x(p.x), y(p.y), z(p.z) {
-    //if (p.w != 0) throw "Can't convert Point with w != 0 to a V3";
+    // if (p.w != 0) throw "Can't convert Point with w != 0 to a V3";
 }
 
 inline V3::operator Point() const { return Point(x, y, z, 0.f); }

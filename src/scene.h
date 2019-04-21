@@ -43,35 +43,38 @@ struct LightInstance {
     }
 };
 
+inline BVH constructSceneBVH(std::vector<Instance> const& instances) {
+    std::vector<Box> b;
+    b.reserve(instances.size());
+
+    for (auto const& i : instances) {
+        b.push_back(i.bb());
+    }
+
+    return BVH::construct(b);
+}
+
 class Scene {
-public:
+   public:
     Scene(std::vector<Instance> instances, std::vector<LightInstance> lights)
-        : instances(std::move(instances)), lights(std::move(lights)) {
+        : instances(std::move(instances)),
+          lights(std::move(lights)),
+          bvh(constructSceneBVH(this->instances)) {
         // double t = 0;
-        std::vector<Box> b;
-        b.reserve(this->instances.size());
+        // for (auto const& i : this->instances) {
+        // area really should be scaled by transform...
+        // t += (*i)->light*(*i)->w();
+        // ecdf.push_back(t);
 
-        for (auto const& i : this->instances) {
-            // area really should be scaled by transform...
-            // t += (*i)->light*(*i)->w();
-            // ecdf.push_back(t);
-
-            // light |= (*i)->light;
-
-            Box const& box = i.bb();
-            b.push_back(box);
-        }
-
-        bvh.construct(b);
+        // light |= (*i)->light;
+        //}
     }
 
     Instance const* min(Ray const& r, Dip& dip, float& t) const {
-        return min(bvh.n[0], r, 1.f/r.d, dip, t);
+        return min(bvh.root(), r, dip, t);
     }
 
-    bool any(Ray const& r, float t) const {
-        return any(bvh.n[0], r, 1.f/r.d, t);
-    }
+    bool any(Ray const& r, float t) const { return any(bvh.root(), r, t); }
 
     /*Dip r() const
 {
@@ -85,7 +88,7 @@ float w() const {
     return ecdf.back();
 }*/
 
-    Box bb() const { return bvh.root(); }
+    Box bb() const { return bvh.root().box; }
 
     std::pair<rgba, Point> sampleL(Dip const& d) const {
         return lights.at(0).sample(d);
@@ -99,11 +102,10 @@ float w() const {
         return r;
     }
 
-private:
-    Instance const* min(BVH::Node const& node, Ray const& r, V3 const& id,
-                           Dip& dip, float& t) const {
-        if(!node.box.intersect(r.o, id, t))
-            return nullptr;
+   private:
+    Instance const* min(BVH::Node const& node, FastRay const& r, Dip& dip,
+                        float& t) const {
+        if (!node.box.intersect(r, t)) return nullptr;
 
         if (node.end > 0) {
             Instance const* out = nullptr;
@@ -113,15 +115,14 @@ private:
             }
             return out;
         } else {
-            auto left = min(bvh.n[node.begin], r, id, dip, t);
-            auto right = min(bvh.n[node.begin + 1], r, id, dip, t);
+            auto left = min(bvh.n[node.begin], r, dip, t);
+            auto right = min(bvh.n[node.begin + 1], r, dip, t);
             return right ? right : left;
         }
     }
 
-    bool any(BVH::Node const& node, Ray const& r, V3 const& id, float t) const {
-        if(!node.box.intersect(r.o, id, t))
-            return false;
+    bool any(BVH::Node const& node, FastRay const& r, float t) const {
+        if (!node.box.intersect(r, t)) return false;
 
         if (node.end > 0) {
             for (int i = node.begin; i < node.end; i++) {
@@ -129,15 +130,14 @@ private:
             }
             return false;
         } else {
-            return any(bvh.n[node.begin], r, id, t) ||
-                   any(bvh.n[node.begin + 1], r, id, t);
+            return any(bvh.n[node.begin], r, t) ||
+                   any(bvh.n[node.begin + 1], r, t);
         }
     }
 
     const std::vector<Instance> instances;
     const std::vector<LightInstance> lights;
-    BVH bvh;
+    const BVH bvh;
 
     // std::vector<float> ecdf;
 };
-

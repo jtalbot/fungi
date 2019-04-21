@@ -14,12 +14,7 @@ BVH constructBVH(std::vector<P3> const& v,
         b.push_back(Box().insert(v[t.a]).insert(v[t.b]).insert(v[t.c]));
     }
 
-    // printf("Starting BVH\n");
-    BVH bvh;
-    bvh.construct(b);
-    // printf("Ending BVH\n");
-
-    return bvh;
+    return BVH::construct(b);
 }
 
 std::vector<float> constructECDF(std::vector<P3> const& v,
@@ -54,18 +49,11 @@ struct Mesh::Impl {
           bvh(constructBVH(this->v, this->m)),
           ecdf(constructECDF(this->v, this->m)) {}
 
-    struct HitTest {
-        Ray const& r;
-        V3 const& id;
-        Dip& dip;
-        float& t;
-    };
-
     // Mesh functions
-    bool min(BVH::Node const& node, Ray const& r, V3 const& id, Dip& dip,
+    bool min(BVH::Node const& node, FastRay const& r, Dip& dip,
              float& t) const {
         // metrics.bbtests += 1;
-        if (!node.box.intersect(r.o, id, t)) return false;
+        if (!node.box.intersect(r, t)) return false;
 
         if (node.end > 0) {
             bool hit = false;
@@ -80,15 +68,15 @@ struct Mesh::Impl {
             // metrics.tritests += node.end - node.begin;
             return hit;
         } else {
-            auto left = min(bvh.n[node.begin], r, id, dip, t);
-            auto right = min(bvh.n[node.begin + 1], r, id, dip, t);
+            auto left = min(bvh.n[node.begin], r, dip, t);
+            auto right = min(bvh.n[node.begin + 1], r, dip, t);
             return left || right;
         }
     }
 
-    bool any(BVH::Node const& node, Ray const& r, V3 const& id, float t) const {
+    bool any(BVH::Node const& node, FastRay const& r, float t) const {
         // metrics.bbtests += 1;
-        if (!node.box.intersect(r.o, id, t)) return false;
+        if (!node.box.intersect(r, t)) return false;
 
         if (node.end > 0) {
             for (int i = node.begin; i < node.end; i++) {
@@ -101,14 +89,14 @@ struct Mesh::Impl {
             // metrics.tritests += node.end - node.begin;
             return false;
         } else {
-            return any(bvh.n[node.begin], r, id, t) ||
-                   any(bvh.n[node.begin + 1], r, id, t);
+            return any(bvh.n[node.begin], r, t) ||
+                   any(bvh.n[node.begin + 1], r, t);
         }
     }
 
     // Triangle functions
     V3 intersect(Mesh::Triangle const& t, Ray const& r) const {
-        auto x = Transform{Point(v[t.b]) - v[t.a], Point(v[t.c]) - v[t.a], -r.d,
+        auto x = Transform{v[t.b] - v[t.a], v[t.c] - v[t.a], -r.d,
                            Point(0, 0, 0, 1)};
 
         return V3(x * (r.o - v[t.a]));
@@ -122,8 +110,8 @@ struct Mesh::Impl {
     Dip sample(Triangle const& t, Point const& p) const {
         auto i = interpolate(v[t.a], v[t.b], v[t.c], p.x, p.y);
 
-        auto didu = v[t.b] - v[t.a];
-        auto didv = v[t.c] - v[t.a];
+        auto didu = normalize(v[t.b] - v[t.a]);
+        auto didv = normalize(v[t.c] - v[t.a]);
 
         auto tuv = uv.size() > 0
                        ? interpolate(uv[t.a], uv[t.b], uv[t.c], p.x, p.y)
@@ -168,14 +156,14 @@ Dip Mesh::r() const {
 
 float Mesh::w() const { return impl->ecdf.back(); }
 
-Box Mesh::bb() const { return impl->bvh.root(); }
+Box Mesh::bb() const { return impl->bvh.root().box; }
 
 bool Mesh::min(Ray const& r, Dip& dip, float& t) const {
     // metrics.rays++;
-    return impl->min(impl->bvh.n[0], r, 1.f / r.d, dip, t);
+    return impl->min(impl->bvh.root(), r, dip, t);
 }
 
 bool Mesh::any(Ray const& r, float t) const {
     // metrics.rays++;
-    return impl->any(impl->bvh.n[0], r, 1.f / r.d, t);
+    return impl->any(impl->bvh.root(), r, t);
 }

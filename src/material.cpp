@@ -9,8 +9,8 @@
 
 Transform makeLocal(Dip const& d) {
     auto x = normalize(d.didu);
-    auto z = cross(x,normalize(d.didv));
-    auto y = cross(z,x);
+    auto z = normalize(cross(x, d.didv));
+    auto y = cross(z, x);
 
     return Transform(x, y, z, Point(0, 0, 0, 1));
 }
@@ -172,8 +172,8 @@ std::pair<rgba, V3> BumpMaterial::sample(Dip const& dip, V3 const& i) const {
 
     auto n = normalize(cross(dip.didu, dip.didv));
 
-    V3 du = dip.didu + n * (d1 - d0) * dip.dtdu.length() / 0.01;
-    V3 dv = dip.didv + n * (d2 - d0) * dip.dtdv.length() / 0.01;
+    V3 du = normalize(dip.didu) + n * (d1 - d0) * dip.dtdu.length()/0.1;
+    V3 dv = normalize(dip.didv) + n * (d2 - d0) * dip.dtdv.length()/0.1;
 
     auto newDip = Dip{dip.i, du, dv, dip.uv, dip.dtdu, dip.dtdv};
 
@@ -312,13 +312,10 @@ std::pair<rgba, V3> MetalMaterial::sample(Dip const& dip, V3 const& in) const {
     return std::make_pair(Kr->eval(dip.uv), r);
 }*/
 
-rgba PlasticMaterial::eval(P2 const& uv) const {
-    return Kd->eval(uv);
-}
+rgba PlasticMaterial::eval(P2 const& uv) const { return Kd->eval(uv); }
 
 std::pair<rgba, V3> PlasticMaterial::sample(Dip const& dip,
                                             V3 const& in) const {
     auto out = V3(~makeLocal(dip) * sampleHemisphere(1));
     return std::make_pair(eval(dip.uv), out);
 }
-

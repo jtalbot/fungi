@@ -64,18 +64,13 @@ struct Sensor {
         }
     }
 
-    void detect(P2 const& p, rgba const& c) {
+    void detect(int x, int y, rgba const& c) {
         samples++;
 
-        auto x = p.u - 0.5f;
-        auto y = p.v - 0.5f;
-
-        auto ix = (int)round(x);
-        auto iy = (int)round(y);
         float weight = 1;
-        pixel(ix, iy).sum += c * weight;
-        pixel(ix, iy).weight += weight;
-        pixel(ix, iy).samples++;
+        pixel(x, y).sum += c * weight;
+        pixel(x, y).weight += weight;
+        pixel(x, y).samples++;
 
         /*int left = max(0,ceil(x-half)), right = min(xres-1,floor(x+half));
         int bottom = max(0,ceil(y-half)), top = min(yres-1,floor(y+half));
@@ -109,9 +104,11 @@ struct Sensor {
 
     void outputEXR(std::string const& filename);
 
-    Pixel& pixel(int x, int y) { return array[y * xres + x]; }
+    Pixel& pixel(int x, int y) {
+        return array[y * xres + x];
+    }
 
-    P2 sample(int64_t i, int64_t samples, P2& pixel) const {
+    P2 sample(int64_t i, int64_t samples, int& x, int& y) const {
         auto samplesPerPixel = std::div(samples, (int64_t)(xres * yres));
         if (i < samples - samplesPerPixel.rem) {
             i = i / samplesPerPixel.quot;
@@ -122,13 +119,15 @@ struct Sensor {
         }
 
         auto s = std::div(i, (int64_t)xres);
+        x = s.rem;
+        y = s.quot;
         auto p = sampleUnitSquare();
-        pixel = P2(s.rem + p.u, s.quot + p.v);
+        auto uv = P2(s.rem + p.u, s.quot + p.v);
 
-        auto x = (2 * pixel.u - xres) / scale;
-        auto y = (2 * pixel.v - yres) / scale;
+        auto u = (2 * uv.u - xres) / scale;
+        auto v = (2 * uv.v - yres) / scale;
 
-        return P2(x, -y);
+        return P2(u, -v);
     }
 
     /*
@@ -156,7 +155,6 @@ struct Sensor {
                                     out.write( (char*)&c.b, sizeof( float ) );
                             }
                     }
-                    
 
                     out.close();
 
