@@ -7,10 +7,9 @@
 #include "box.h"
 #include "la.h"
 #include "ray.h"
-#include "sample.h"
 
 class Shape {
-   public:
+public:
     Shape() {}
 
     virtual ~Shape() {}
@@ -25,173 +24,33 @@ class Shape {
 };
 
 class Mesh : public Shape {
-   public:
+public:
     struct Triangle {
-        int a, b, c;
-
-        Triangle() {}
-
-        Triangle(int a, int b, int c) : a(a), b(b), c(c) {}
-
-        V3 intersect(Mesh const& m, Ray const& r) const {
-            auto x = Transform{Point(m.v[b]) - m.v[a], Point(m.v[c]) - m.v[a],
-                               -r.d, Point(0, 0, 0, 1)};
-
-            return V3(x * (r.o - m.v[a]));
-        }
-
-        static bool isInside(V3 const& i, float const t) {
-            return i.x >= 0 && i.y >= 0 && i.x + i.y < 1 && i.z > 0.00001f &&
-                   i.z < t;
-        }
-
-        Dip sample(Mesh const& m, Point const& t) const {
-            auto i = interpolate(m.v[a], m.v[b], m.v[c], t.x, t.y);
-
-            auto didu = V3(m.v[b].x - m.v[a].x, m.v[b].y - m.v[a].y,
-                           m.v[b].z - m.v[a].z);
-            auto didv = V3(m.v[c].x - m.v[a].x, m.v[c].y - m.v[a].y,
-                           m.v[c].z - m.v[a].z);
-
-
-            P2 uv = m.uv.size() > 0
-                        ? interpolate(m.uv[a], m.uv[b], m.uv[c], t.x, t.y)
-                        : P2(t.x, t.y);
-
-            auto dtdu = m.uv.size() > 0
-                            ? P2(m.uv[b].u - m.uv[a].u, m.uv[b].v - m.uv[a].v)
-                            : P2(1, 0);
-
-            auto dtdv = m.uv.size() > 0
-                            ? P2(m.uv[c].u - m.uv[a].u, m.uv[c].v - m.uv[a].v)
-                            : P2(0, 1);
-
-            return Dip{i, didu, didv,
-                       uv, dtdu, dtdv};
-        }
-
-        Dip r(Mesh const& m) const {
-            // Use transform that maintains stratification
-            float u = gi_random(), v = gi_random();
-            Point i((v > u) ? 0.5 * u : u - 0.5 * v,
-                    (v > u) ? v - 0.5 * u : 0.5 * v, 0, 1);
-
-            return sample(m, i);
-        }
+        uint32_t a, b, c;
     };
 
-    Mesh(std::vector<P3> vertexes, std::vector<V3> normals, std::vector<P2> uvs,
-         std::vector<Triangle> triangles)
-        : Shape(),
-          v(std::move(vertexes)),
-          n(std::move(normals)),
-          uv(std::move(uvs)),
-          m(std::move(triangles)),
-          rays(0),
-          tritests(0),
-          bbtests(0) {
-        std::vector<Box> b;
-        b.reserve(m.size());
-        ecdf.reserve(m.size());
+    struct Metrics {
+        int64_t rays;
+        int64_t tritests;
+        int64_t bbtests;
+    };
 
-        float sum = 0;
-        for (auto const& t : m) {
-            sum += (v[t.a] * v[t.b] * v[t.c]).q();
-            ecdf.push_back(sum);
+    Mesh(std::vector<P3> vertexes,
+         std::vector<V3> normals,
+         std::vector<P2> uvs,
+         std::vector<Triangle> triangles);
+    ~Mesh();
 
-            b.push_back(Box().insert(v[t.a]).insert(v[t.b]).insert(v[t.c]));
-        }
+    bool min(Ray const& r, Dip& dip, float& t) const override final;
+    bool any(Ray const& r, float t) const override final;
 
-        // printf("Starting BVH\n");
-        bvh.construct(b);
-        // printf("Ending BVH\n");
-    }
-
-    //~Mesh() {
-    //	printf("tri/ray: %f\n", (float)tritests/rays);
-    //	printf("bb/ray:  %f\n", (float)bbtests/rays);
-    //}
-
-    bool min(Ray const& r, Dip& dip, float& t) const override final {
-        rays++;
-        return min(bvh.n[0], r, 1.f/r.d, dip, t);
-    }
-
-    bool any(Ray const& r, float t) const override final {
-        rays++;
-        return any(bvh.n[0], r, 1.f/r.d, t);
-    }
-
-    Dip r() const override final {
-        float s = gi_random() * ecdf.back();
-        size_t i = std::upper_bound(ecdf.begin(), ecdf.end(), s) - ecdf.begin();
-        Dip dip = m[i].r(*this);
-        //dip.p = dip.p *
-        //        (ecdf.back() / ((i == 0) ? ecdf[0] : (ecdf[i] - ecdf[i - 1])));
-        return dip;
-    }
-
-    float w() const override final { return ecdf.back(); }
-
-    Box bb() const override final { return bvh.root(); }
+    Dip r() const override final;
+    float w() const override final;
+    Box bb() const override final;
 
 private:
-    bool min(BVH::Node const& node, Ray const& r, V3 const& id, Dip& dip, float& t) const {
-        bbtests += 1;
-        if(!node.box.intersect(r.o, id, t))
-            return false;
-
-        if (node.end > 0) {
-            bool hit = false;
-            for (int i = node.begin; i < node.end; i++) {
-                auto intersection = m[bvh.o[i]].intersect(*this, r);
-                if (Triangle::isInside(intersection, t)) {
-                    t = intersection.z;
-                    dip = m[bvh.o[i]].sample(*this, intersection);
-                    hit = true;
-                }
-            }
-            tritests += node.end-node.begin;
-            return hit;
-        } else {
-            auto left = min(bvh.n[node.begin], r, id, dip, t);
-            auto right = min(bvh.n[node.begin + 1], r, id, dip, t);
-            return left || right;
-        }
-    }
-
-    bool any(BVH::Node const& node, Ray const& r, V3 const& id, float t) const {
-        bbtests += 1;
-        if(!node.box.intersect(r.o, id, t))
-            return false;
-
-        if (node.end > 0) {
-            for (int i = node.begin; i < node.end; i++) {
-                auto intersection = m[bvh.o[i]].intersect(*this, r);
-                if (Triangle::isInside(intersection, t)) {
-                    tritests += (i+1)-node.begin;
-                    return true;
-                }
-            }
-            tritests += node.end-node.begin;
-            return false;
-        } else {
-            return any(bvh.n[node.begin], r, id, t) ||
-                   any(bvh.n[node.begin + 1], r, id, t);
-        }
-    }
-
-    const std::vector<P3> v;        // vertices
-    const std::vector<V3> n;        // might be empty
-    const std::vector<P2> uv;       // might be empty
-    const std::vector<Triangle> m;  // triangles
-    BVH bvh;
-
-    std::vector<float> ecdf;
-
-    mutable int64_t rays;
-    mutable int64_t tritests;
-    mutable int64_t bbtests;
+    struct Impl;
+    std::unique_ptr<Impl> impl;
 };
 
 /*class Sphere : public Shape {

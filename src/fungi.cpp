@@ -115,9 +115,9 @@ std::vector<Mesh::Triangle> makeTriangles(tinyobj::shape_t const& shape) {
     std::vector<Mesh::Triangle> triangles;
     triangles.reserve(shape.mesh.indices.size() / 3);
     for (size_t f = 0; f < shape.mesh.indices.size(); f += 3) {
-        triangles.push_back(Mesh::Triangle(shape.mesh.indices[f + 0],
+        triangles.push_back(Mesh::Triangle{shape.mesh.indices[f + 0],
                                            shape.mesh.indices[f + 1],
-                                           shape.mesh.indices[f + 2]));
+                                           shape.mesh.indices[f + 2]});
     }
     return triangles;
 }
